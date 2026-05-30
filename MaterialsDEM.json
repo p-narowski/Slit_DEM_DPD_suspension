@@ -40,12 +40,12 @@
                 "COEFFICIENT_OF_RESTITUTION": 0.1,
                 "ROLLING_FRICTION": 0.0,
                 "ROLLING_FRICTION_WITH_WALLS": 0.0,
-                "DAMPING_GAMMA": 4.5,
+                "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.3,
                 "DPD_CUTOFF_RADIUS": 0.3,
-                "DPD_CONSERVATIVE_COEFF": 25.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 1.5,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 1.5
+                "DPD_CONSERVATIVE_COEFF": 5.0,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 15.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 15.0
             }
         },
         {
@@ -66,12 +66,12 @@
                 "COEFFICIENT_OF_RESTITUTION": 0.1,
                 "ROLLING_FRICTION": 0.0,
                 "ROLLING_FRICTION_WITH_WALLS": 0.0,
-                "DAMPING_GAMMA": 4.5,
+                "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.3,
                 "DPD_CUTOFF_RADIUS": 0.3,
-                "DPD_CONSERVATIVE_COEFF": 25.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 1.5,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 1.5
+                "DPD_CONSERVATIVE_COEFF": 5.0,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 15.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 15.0
             }
         },
         {
@@ -92,12 +92,12 @@
                 "COEFFICIENT_OF_RESTITUTION": 0.1,
                 "ROLLING_FRICTION": 0.0,
                 "ROLLING_FRICTION_WITH_WALLS": 0.0,
-                "DAMPING_GAMMA": 4.5,
+                "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.3,
                 "DPD_CUTOFF_RADIUS": 0.3,
-                "DPD_CONSERVATIVE_COEFF": 25.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 1.5,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 1.5
+                "DPD_CONSERVATIVE_COEFF": 5.0,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 15.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 15.0
             }
         },
         {
