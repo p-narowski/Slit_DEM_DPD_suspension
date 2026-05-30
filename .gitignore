@@ -1,0 +1,22 @@
+# --- FOLDERS TO IGNORE ---
+Slit_Graphs/
+Slit_Post_Files/
+Slit_Post_VTK_Files/
+
+# --- LOG FILES ---
+crash.log
+simulation.log
+*.log
+
+# --- POSTPROCESSING LIST FILES ---
+Slit.post.lst
+SlitDEM.post.lst
+*.lst
+
+# --- OPTIONAL: IGNORE GENERATED MDPA FILES ---
+# Uncomment if these are generated automatically
+# *.mdpa
+
+# --- PYTHON CACHE ---
+__pycache__/
+*.pyc

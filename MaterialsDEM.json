@@ -1,0 +1,134 @@
+{
+    "materials": [
+        {
+            "material_name": "DEM-Fluid",
+            "material_id": 1,
+            "Variables": {
+                "PARTICLE_DENSITY": 900.0,
+                "YOUNG_MODULUS": 8.25e7,
+                "POISSON_RATIO": 0.42,
+                "PARTICLE_SPHERICITY": 1.0
+            }
+        },
+        {
+            "material_name": "DEM-Wall",
+            "material_id": 2,
+            "Variables": {
+                "PARTICLE_DENSITY": 7850.0,
+                "YOUNG_MODULUS": 2.0e11,
+                "POISSON_RATIO": 0.30,
+                "PARTICLE_SPHERICITY": 1.0
+            }
+        }
+    ],
+    "material_relations": [
+        {
+            "material_names_list": [
+                "DEM-Fluid",
+                "DEM-Fluid"
+            ],
+            "material_ids_list": [
+                1,
+                1
+            ],
+            "Variables": {
+                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_SPH_LIKE",
+                "PARTICLE_COHESION": 0.0,
+                "STATIC_FRICTION": 0.0,
+                "DYNAMIC_FRICTION": 0.0,
+                "FRICTION_DECAY": 500.0,
+                "COEFFICIENT_OF_RESTITUTION": 0.1,
+                "ROLLING_FRICTION": 0.0,
+                "ROLLING_FRICTION_WITH_WALLS": 0.0,
+                "DAMPING_GAMMA": 4.5,
+                "DPD_SMOOTHING_LENGTH": 0.3,
+                "DPD_CUTOFF_RADIUS": 0.3,
+                "DPD_CONSERVATIVE_COEFF": 25.0,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 1.5,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 1.5
+            }
+        },
+        {
+            "material_names_list": [
+                "DEM-Fluid",
+                "DEM-Wall"
+            ],
+            "material_ids_list": [
+                1,
+                2
+            ],
+            "Variables": {
+                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_SPH_LIKE",
+                "PARTICLE_COHESION": 0.0,
+                "STATIC_FRICTION": 0.0,
+                "DYNAMIC_FRICTION": 0.0,
+                "FRICTION_DECAY": 500.0,
+                "COEFFICIENT_OF_RESTITUTION": 0.1,
+                "ROLLING_FRICTION": 0.0,
+                "ROLLING_FRICTION_WITH_WALLS": 0.0,
+                "DAMPING_GAMMA": 4.5,
+                "DPD_SMOOTHING_LENGTH": 0.3,
+                "DPD_CUTOFF_RADIUS": 0.3,
+                "DPD_CONSERVATIVE_COEFF": 25.0,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 1.5,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 1.5
+            }
+        },
+        {
+            "material_names_list": [
+                "DEM-Wall",
+                "DEM-Fluid"
+            ],
+            "material_ids_list": [
+                2,
+                1
+            ],
+            "Variables": {
+                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_SPH_LIKE",
+                "PARTICLE_COHESION": 0.0,
+                "STATIC_FRICTION": 0.0,
+                "DYNAMIC_FRICTION": 0.0,
+                "FRICTION_DECAY": 500.0,
+                "COEFFICIENT_OF_RESTITUTION": 0.1,
+                "ROLLING_FRICTION": 0.0,
+                "ROLLING_FRICTION_WITH_WALLS": 0.0,
+                "DAMPING_GAMMA": 4.5,
+                "DPD_SMOOTHING_LENGTH": 0.3,
+                "DPD_CUTOFF_RADIUS": 0.3,
+                "DPD_CONSERVATIVE_COEFF": 25.0,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 1.5,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 1.5
+            }
+        },
+        {
+            "material_names_list": [
+                "DEM-Wall",
+                "DEM-Wall"
+            ],
+            "material_ids_list": [
+                2,
+                2
+            ],
+            "Variables": {
+                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_D_Hertz_viscous_Coulomb",
+                "PARTICLE_COHESION": 0.0,
+                "STATIC_FRICTION": 0.4,
+                "DYNAMIC_FRICTION": 0.3,
+                "FRICTION_DECAY": 500.0,
+                "COEFFICIENT_OF_RESTITUTION": 0.8,
+                "ROLLING_FRICTION": 0.01,
+                "ROLLING_FRICTION_WITH_WALLS": 0.01
+            }
+        }
+    ],
+    "material_assignation_table": [
+        [
+            "RigidFacePart.DEM-FEM-Wall_SlitWalls",
+            "DEM-Wall"
+        ],
+        [
+            "SpheresPart.DEMParts_ParticlesPart",
+            "DEM-Fluid"
+        ]
+    ]
+}

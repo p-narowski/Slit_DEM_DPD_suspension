@@ -1,0 +1,33 @@
+Begin ModelPartData
+End ModelPartData
+
+Begin Properties 2
+End Properties
+
+Begin Nodes
+  1001  0.0  0.0  0.0
+  1002  1.0  0.0  0.0
+  1003  1.0  1.0  0.0
+  1004  0.0  1.0  0.0
+  1101  0.0  0.0  0.5
+  1102  1.0  0.0  0.5
+  1103  1.0  1.0  0.5
+  1104  0.0  1.0  0.5
+End Nodes
+
+Begin Conditions RigidFace3D3N
+  1  2  1001 1002 1003
+  2  2  1001 1003 1004
+  3  2  1101 1102 1103
+  4  2  1101 1103 1104
+End Conditions
+
+Begin SubModelPart DEM-FEM-Wall_SlitWalls
+  Begin SubModelPartNodes
+    1001 1002 1003 1004
+    1101 1102 1103 1104
+  End SubModelPartNodes
+  Begin SubModelPartConditions
+    1 2 3 4
+  End SubModelPartConditions
+End SubModelPart
