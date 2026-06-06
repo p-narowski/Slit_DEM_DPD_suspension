@@ -13,7 +13,7 @@
     "BoundingBoxStartTime": 0.0,
     "BoundingBoxStopTime": 100.0,
     "dem_inlet_option": false,
-    "GravityX": 10,
+    "GravityX": 1.0,
     "GravityY": 0.0,
     "GravityZ": 0.0,
     "RotationOption": true,
