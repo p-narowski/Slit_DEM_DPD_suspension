@@ -60,7 +60,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
             mag = (f[0]**2 + f[1]**2 + f[2]**2)**0.5
             if mag > max_f:
                 max_f = mag
-        print(f"[t={self.time:.4f}] Max |TOTAL_FORCES| = {max_f:.6e}")
+        #print(f"[t={self.time:.4f}] Max |TOTAL_FORCES| = {max_f:.6e}")
 
 
 if __name__ == "__main__":
