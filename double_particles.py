@@ -2,8 +2,6 @@
 """
 double_particles.py
 Doubles the number of DPDParticle particles in a Kratos .mdpa file.
-Each existing particle is duplicated with a small random jitter so the
-new particle doesn't sit exactly on top of its parent.
 Usage:
     python double_particles.py SlitDEM.mdpa SlitDEM_x2.mdpa
 """
@@ -12,146 +10,110 @@ import sys
 import re
 import random
 
-JITTER = 0.01   # max displacement in each axis for the duplicate particle
+JITTER = 0.01  # max displacement per axis for duplicate particle
 
 
-def make_block_pattern(block_name):
+def find_block(text, begin_keyword):
     """
-    Build a regex pattern for a Kratos mdpa block.
-    Words in block_name are separated by \\s+ so spaces don't need escaping.
-    Example: 'Elements DPDParticle' -> r'Elements\s+DPDParticle'
+    Find a block that starts with a line beginning with 'Begin <begin_keyword>'
+    (anything may follow on that line) and ends with 'End <begin_keyword>'.
+    Returns (start_idx, end_idx, header_line, body, end_tag) or raises ValueError.
     """
-    escaped_words = [re.escape(w) for w in block_name.split()]
-    name_pattern = r'\s+'.join(escaped_words)
-    return re.compile(
-        r'(Begin\s+' + name_pattern + r'[^\n]*\n)'
-        r'(.*?)'
-        r'(End\s+' + name_pattern + r')',
+    # Build pattern: Begin, whitespace, then the keyword words joined by \s+
+    words = begin_keyword.split()
+    kw_pat = r'\s+'.join(re.escape(w) for w in words)
+    pat = re.compile(
+        r'([ \t]*Begin[ \t]+' + kw_pat + r'[^\n]*\n)'  # header
+        r'(.*?)'                                          # body
+        r'([ \t]*End[ \t]+' + kw_pat + r'[^\n]*)',       # footer
         re.DOTALL
     )
-
-
-def parse_block(text, block_name):
-    """Return (start, end, header_line, body, footer_line) for a named block."""
-    pattern = make_block_pattern(block_name)
-    m = pattern.search(text)
+    m = pat.search(text)
     if m is None:
-        raise ValueError(f"Block '{block_name}' not found.")
+        raise ValueError(f"Block 'Begin {begin_keyword}' not found in file.")
     return m.start(), m.end(), m.group(1), m.group(2), m.group(3)
 
 
-def double_particles(src_path, dst_path):
+def double_particles(src, dst):
     random.seed(42)
-
-    with open(src_path, 'r') as f:
+    with open(src) as f:
         text = f.read()
 
-    # ── 1. Nodes ────────────────────────────────────────────────────────────
-    ns, ne, nh, node_body, nf = parse_block(text, 'Nodes')
-    node_lines = [l for l in node_body.split('\n') if l.strip()]
-    n_orig = len(node_lines)
-    print(f"Original nodes: {n_orig}")
+    # ── 1. Nodes ─────────────────────────────────────────────────────────────
+    ns, ne, nh, node_body, nf = find_block(text, 'Nodes')
+    node_re = re.compile(r'^\s*(\d+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)', re.M)
+    orig_nodes = node_re.findall(node_body)
+    n = len(orig_nodes)
+    print(f"Nodes found: {n}")
 
-    node_re = re.compile(r'^\s*(\d+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)')
     new_node_lines = []
-    for line in node_lines:
-        m = node_re.match(line)
-        if not m:
-            continue
-        nid = int(m.group(1))
-        x = float(m.group(2))
-        y = float(m.group(3))
-        z = float(m.group(4))
-        # apply jitter; clamp z strictly inside the slit (0, 0.5)
-        new_x = (x + random.uniform(-JITTER, JITTER)) % 1.0
-        new_y = (y + random.uniform(-JITTER, JITTER)) % 1.0
-        new_z = z + random.uniform(-JITTER, JITTER)
-        new_z = max(0.001, min(0.499, new_z))
-        new_id = nid + n_orig
-        new_node_lines.append(f"  {new_id:6d}  {new_x:.6f}  {new_y:.6f}  {new_z:.6f}")
+    for nid, x, y, z in orig_nodes:
+        nid = int(nid)
+        nx = (float(x) + random.uniform(-JITTER, JITTER)) % 1.0
+        ny = (float(y) + random.uniform(-JITTER, JITTER)) % 1.0
+        nz = float(z) + random.uniform(-JITTER, JITTER)
+        nz = max(0.001, min(0.499, nz))
+        new_node_lines.append(f"  {nid + n}  {nx:.6f}  {ny:.6f}  {nz:.6f}")
 
-    new_node_body = node_body + '\n'.join(new_node_lines) + '\n'
-    new_nodes_block = nh + new_node_body + nf
+    new_nodes_block = nh + node_body + '\n'.join(new_node_lines) + '\n' + nf
 
-    # ── 2. Elements (DPDParticle) ────────────────────────────────────────────
-    es, ee, eh, elem_body, ef = parse_block(text, 'Elements DPDParticle')
-    elem_lines = [l for l in elem_body.split('\n') if l.strip()]
-    n_elem = len(elem_lines)
-    print(f"Original elements: {n_elem}")
+    # ── 2. Elements DPDParticle ───────────────────────────────────────────────
+    es, ee, eh, elem_body, ef = find_block(text, 'Elements DPDParticle')
+    elem_re = re.compile(r'^\s*(\d+)\s+(\d+)\s+(\d+)', re.M)
+    orig_elems = elem_re.findall(elem_body)
+    ne_count = len(orig_elems)
+    print(f"Elements found: {ne_count}")
 
-    elem_re = re.compile(r'^\s*(\d+)\s+(\d+)\s+(\d+)')
     new_elem_lines = []
-    for line in elem_lines:
-        m = elem_re.match(line)
-        if not m:
-            continue
-        eid = int(m.group(1))
-        pid = int(m.group(2))
-        nid = int(m.group(3))
-        new_eid = eid + n_elem
-        new_nid = nid + n_orig   # points to the duplicated node
-        new_elem_lines.append(f"  {new_eid:6d}  {pid}  {new_nid}")
+    for eid, pid, node in orig_elems:
+        new_elem_lines.append(f"  {int(eid) + ne_count}  {pid}  {int(node) + n}")
 
-    new_elem_body = elem_body + '\n'.join(new_elem_lines) + '\n'
-    new_elems_block = eh + new_elem_body + ef
+    new_elems_block = eh + elem_body + '\n'.join(new_elem_lines) + '\n' + ef
 
-    # ── 3. NodalData RADIUS ──────────────────────────────────────────────────
-    rs, re_, rh, rad_body, rf = parse_block(text, 'NodalData RADIUS')
-    rad_lines = [l for l in rad_body.split('\n') if l.strip()]
-    rad_re = re.compile(r'^\s*(\d+)\s+(\d+)\s+([\d.eE+\-]+)')
+    # ── 3. NodalData RADIUS ───────────────────────────────────────────────────
+    rs, re_, rh, rad_body, rf = find_block(text, 'NodalData RADIUS')
+    rad_re = re.compile(r'^\s*(\d+)\s+(\d+)\s+([\d.eE+\-]+)', re.M)
+    orig_rads = rad_re.findall(rad_body)
     new_rad_lines = []
-    for line in rad_lines:
-        m = rad_re.match(line)
-        if not m:
-            continue
-        nid = int(m.group(1))
-        step = int(m.group(2))
-        val = m.group(3)
-        new_rad_lines.append(f"  {nid + n_orig:6d}  {step}  {val}")
-    new_rad_body = rad_body + '\n'.join(new_rad_lines) + '\n'
-    new_rad_block = rh + new_rad_body + rf
+    for nid, step, val in orig_rads:
+        new_rad_lines.append(f"  {int(nid) + n}  {step}  {val}")
+    new_rad_block = rh + rad_body + '\n'.join(new_rad_lines) + '\n' + rf
 
-    # ── 4. Optional scalar NodalData blocks (VELOCITY_X/Y/Z, etc.) ──────────
-    def double_nodal_scalar(txt, var_name):
+    # ── 4. SubModelPartNodes (append new node IDs) ────────────────────────────
+    def extend_id_block(txt, block_keyword):
         try:
-            vs, ve, vh, vbody, vf = parse_block(txt, f'NodalData {var_name}')
+            bs, be, bh, body, bf = find_block(txt, block_keyword)
         except ValueError:
-            return txt  # block absent – skip silently
-        vlines = [l for l in vbody.split('\n') if l.strip()]
-        vr = re.compile(r'^\s*(\d+)\s+(\d+)\s+([\d.eE+\-]+)')
-        new_vlines = []
-        for line in vlines:
-            mv = vr.match(line)
-            if not mv:
-                continue
-            nid = int(mv.group(1))
-            step = mv.group(2)
-            val = mv.group(3)
-            new_vlines.append(f"  {nid + n_orig:6d}  {step}  {val}")
-        new_vbody = vbody + '\n'.join(new_vlines) + '\n'
-        new_block = vh + new_vbody + vf
-        return txt[:vs] + new_block + txt[ve:]
+            return txt
+        existing = list(map(int, re.findall(r'\d+', body)))
+        if not existing:
+            return txt
+        max_id = max(existing)
+        new_ids = [str(i) for i in range(max_id + 1, max_id + 1 + len(existing))]
+        new_body = body.rstrip('\n') + '\n' + '\n'.join(new_ids) + '\n'
+        return txt[:bs] + bh + new_body + bf + txt[be:]
 
-    # ── 5. Assemble output (replace in reverse order to keep offsets valid) ──
-    blocks_to_replace = sorted([
+    # ── 5. Apply all replacements in reverse offset order ────────────────────
+    replacements = sorted([
         (ns, ne, new_nodes_block),
         (es, ee, new_elems_block),
         (rs, re_, new_rad_block),
     ], key=lambda t: t[0], reverse=True)
 
     out = text
-    for start, end, replacement in blocks_to_replace:
-        out = out[:start] + replacement + out[end:]
+    for start, end, rep in replacements:
+        out = out[:start] + rep + out[end:]
 
-    for var in ('VELOCITY_X', 'VELOCITY_Y', 'VELOCITY_Z'):
-        out = double_nodal_scalar(out, var)
+    # Extend SubModelPart node and element lists
+    for kw in ('SubModelPartNodes', 'SubModelPartElements'):
+        out = extend_id_block(out, kw)
 
-    with open(dst_path, 'w') as f:
+    with open(dst, 'w') as f:
         f.write(out)
 
-    print(f"Done. Written to '{dst_path}'")
-    print(f"  Nodes:    {n_orig}  ->  {n_orig * 2}")
-    print(f"  Elements: {n_elem}  ->  {n_elem * 2}")
+    print(f"Done -> '{dst}'")
+    print(f"  Nodes:    {n} -> {n * 2}")
+    print(f"  Elements: {ne_count} -> {ne_count * 2}")
 
 
 if __name__ == '__main__':
