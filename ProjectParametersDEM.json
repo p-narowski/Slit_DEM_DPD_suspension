@@ -37,7 +37,7 @@
     "MaxTimeStep": 2e-6,
     "FinalTime": 10.0,
     "NeighbourSearchFrequency": 50,
-    "SearchTolerance": 0.3,
+    "SearchTolerance": 0.02,
     "GraphExportFreq": 0.0,
     "VelTrapGraphExportFreq": 0.0,
     "OutputTimeStep": 0.01,
