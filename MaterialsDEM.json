@@ -70,8 +70,8 @@
                 "DPD_SMOOTHING_LENGTH": 0.08,
                 "DPD_CUTOFF_RADIUS": 0.08,
                 "DPD_CONSERVATIVE_COEFF": 25.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 16.0,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 20.0
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 50.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 100.0
             }
         },
         {
@@ -96,8 +96,8 @@
                 "DPD_SMOOTHING_LENGTH": 0.08,
                 "DPD_CUTOFF_RADIUS": 0.08,
                 "DPD_CONSERVATIVE_COEFF": 25.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 16.0,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 20.0
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 50.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 100.0
             }
         },
         {
