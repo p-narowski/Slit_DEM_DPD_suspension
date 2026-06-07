@@ -14,14 +14,26 @@ import random
 
 JITTER = 0.01   # max displacement in each axis for the duplicate particle
 
-def parse_block(text, block_name):
-    """Return (start, end, header_line, body, footer_line) for a named block."""
-    pattern = re.compile(
-        r'(Begin\s+' + re.escape(block_name) + r'[^\n]*\n)'
+
+def make_block_pattern(block_name):
+    """
+    Build a regex pattern for a Kratos mdpa block.
+    Words in block_name are separated by \\s+ so spaces don't need escaping.
+    Example: 'Elements DPDParticle' -> r'Elements\s+DPDParticle'
+    """
+    escaped_words = [re.escape(w) for w in block_name.split()]
+    name_pattern = r'\s+'.join(escaped_words)
+    return re.compile(
+        r'(Begin\s+' + name_pattern + r'[^\n]*\n)'
         r'(.*?)'
-        r'(End\s+' + re.escape(block_name) + r')',
+        r'(End\s+' + name_pattern + r')',
         re.DOTALL
     )
+
+
+def parse_block(text, block_name):
+    """Return (start, end, header_line, body, footer_line) for a named block."""
+    pattern = make_block_pattern(block_name)
     m = pattern.search(text)
     if m is None:
         raise ValueError(f"Block '{block_name}' not found.")
@@ -62,7 +74,7 @@ def double_particles(src_path, dst_path):
     new_nodes_block = nh + new_node_body + nf
 
     # ── 2. Elements (DPDParticle) ────────────────────────────────────────────
-    es, ee, eh, elem_body, ef = parse_block(text, r'Elements DPDParticle')
+    es, ee, eh, elem_body, ef = parse_block(text, 'Elements DPDParticle')
     elem_lines = [l for l in elem_body.split('\n') if l.strip()]
     n_elem = len(elem_lines)
     print(f"Original elements: {n_elem}")
@@ -138,8 +150,8 @@ def double_particles(src_path, dst_path):
         f.write(out)
 
     print(f"Done. Written to '{dst_path}'")
-    print(f"  Nodes:    {n_orig}  →  {n_orig * 2}")
-    print(f"  Elements: {n_elem}  →  {n_elem * 2}")
+    print(f"  Nodes:    {n_orig}  ->  {n_orig * 2}")
+    print(f"  Elements: {n_elem}  ->  {n_elem * 2}")
 
 
 if __name__ == '__main__':
