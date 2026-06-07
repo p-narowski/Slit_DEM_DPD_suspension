@@ -15,22 +15,34 @@ JITTER = 0.01  # max displacement per axis for duplicate particle
 
 def find_block(text, begin_keyword):
     """
-    Find a block that starts with a line beginning with 'Begin <begin_keyword>'
-    (anything may follow on that line) and ends with 'End <begin_keyword>'.
-    Returns (start_idx, end_idx, header_line, body, end_tag) or raises ValueError.
+    Find a block that starts with 'Begin <begin_keyword>' (optional trailing text / comments)
+    and ends with 'End <first_word_of_begin_keyword>'.
+
+    The End line only needs to match the FIRST word of begin_keyword because Kratos
+    uses e.g. 'End Elements' (not 'End Elements DPDParticle').
+
+    Returns (start_idx, end_idx, header_line, body, end_tag).
     """
-    # Build pattern: Begin, whitespace, then the keyword words joined by \s+
     words = begin_keyword.split()
-    kw_pat = r'\s+'.join(re.escape(w) for w in words)
-    pat = re.compile(
-        r'([ \t]*Begin[ \t]+' + kw_pat + r'[^\n]*\n)'  # header
-        r'(.*?)'                                          # body
-        r'([ \t]*End[ \t]+' + kw_pat + r'[^\n]*)',       # footer
+    # Begin line: 'Begin', whitespace, all words joined by \\s+, then optional trailing chars
+    begin_pat = r'[ \t]*Begin[ \t]+' + r'[ \t]+'.join(re.escape(w) for w in words) + r'[^\n]*\n'
+    # End line: 'End', whitespace, then FIRST word only (Kratos convention)
+    end_pat = r'[ \t]*End[ \t]+' + re.escape(words[0]) + r'[^\n]*'
+
+    full_pat = re.compile(
+        r'(' + begin_pat + r')'   # group 1: header
+        r'(.*?)'                   # group 2: body
+        r'(' + end_pat + r')',     # group 3: footer
         re.DOTALL
     )
-    m = pat.search(text)
+    m = full_pat.search(text)
     if m is None:
-        raise ValueError(f"Block 'Begin {begin_keyword}' not found in file.")
+        # Debug: show what Begin lines are present
+        present = re.findall(r'Begin\s+\S+[^\n]*', text)
+        raise ValueError(
+            f"Block 'Begin {begin_keyword}' not found.\n"
+            f"Begin lines present: {present[:10]}"
+        )
     return m.start(), m.end(), m.group(1), m.group(2), m.group(3)
 
 
@@ -39,7 +51,7 @@ def double_particles(src, dst):
     with open(src) as f:
         text = f.read()
 
-    # ── 1. Nodes ─────────────────────────────────────────────────────────────
+    # ── 1. Nodes ────────────────────────────────────────────────────────────
     ns, ne, nh, node_body, nf = find_block(text, 'Nodes')
     node_re = re.compile(r'^\s*(\d+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)', re.M)
     orig_nodes = node_re.findall(node_body)
@@ -57,7 +69,7 @@ def double_particles(src, dst):
 
     new_nodes_block = nh + node_body + '\n'.join(new_node_lines) + '\n' + nf
 
-    # ── 2. Elements DPDParticle ───────────────────────────────────────────────
+    # ── 2. Elements DPDParticle ──────────────────────────────────────────────
     es, ee, eh, elem_body, ef = find_block(text, 'Elements DPDParticle')
     elem_re = re.compile(r'^\s*(\d+)\s+(\d+)\s+(\d+)', re.M)
     orig_elems = elem_re.findall(elem_body)
@@ -70,7 +82,7 @@ def double_particles(src, dst):
 
     new_elems_block = eh + elem_body + '\n'.join(new_elem_lines) + '\n' + ef
 
-    # ── 3. NodalData RADIUS ───────────────────────────────────────────────────
+    # ── 3. NodalData RADIUS ──────────────────────────────────────────────────
     rs, re_, rh, rad_body, rf = find_block(text, 'NodalData RADIUS')
     rad_re = re.compile(r'^\s*(\d+)\s+(\d+)\s+([\d.eE+\-]+)', re.M)
     orig_rads = rad_re.findall(rad_body)
@@ -79,7 +91,18 @@ def double_particles(src, dst):
         new_rad_lines.append(f"  {int(nid) + n}  {step}  {val}")
     new_rad_block = rh + rad_body + '\n'.join(new_rad_lines) + '\n' + rf
 
-    # ── 4. SubModelPartNodes (append new node IDs) ────────────────────────────
+    # ── 4. Apply all replacements in reverse offset order ────────────────────
+    replacements = sorted([
+        (ns, ne, new_nodes_block),
+        (es, ee, new_elems_block),
+        (rs, re_, new_rad_block),
+    ], key=lambda t: t[0], reverse=True)
+
+    out = text
+    for start, end, rep in replacements:
+        out = out[:start] + rep + out[end:]
+
+    # ── 5. Extend SubModelPart node and element id lists ─────────────────────
     def extend_id_block(txt, block_keyword):
         try:
             bs, be, bh, body, bf = find_block(txt, block_keyword)
@@ -93,18 +116,6 @@ def double_particles(src, dst):
         new_body = body.rstrip('\n') + '\n' + '\n'.join(new_ids) + '\n'
         return txt[:bs] + bh + new_body + bf + txt[be:]
 
-    # ── 5. Apply all replacements in reverse offset order ────────────────────
-    replacements = sorted([
-        (ns, ne, new_nodes_block),
-        (es, ee, new_elems_block),
-        (rs, re_, new_rad_block),
-    ], key=lambda t: t[0], reverse=True)
-
-    out = text
-    for start, end, rep in replacements:
-        out = out[:start] + rep + out[end:]
-
-    # Extend SubModelPart node and element lists
     for kw in ('SubModelPartNodes', 'SubModelPartElements'):
         out = extend_id_block(out, kw)
 
