@@ -1,4 +1,14 @@
 {
+    "material_assignation_table": [
+        {
+            "model_part_name": "DEMParts_ParticlesPart",
+            "material_id": 1
+        },
+        {
+            "model_part_name": "DEMWalls",
+            "material_id": 2
+        }
+    ],
     "materials": [
         {
             "material_name": "DEM-Fluid",
