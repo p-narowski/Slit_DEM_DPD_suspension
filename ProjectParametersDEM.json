@@ -16,7 +16,7 @@
     "GravityX": 0.2,
     "GravityY": 0.0,
     "GravityZ": 0.0,
-    "RotationOption": true,
+    "RotationOption": false,
     "CleanIndentationsOption": false,
     "solver_settings": {
         "RemoveBallsInitiallyTouchingWalls": false,
