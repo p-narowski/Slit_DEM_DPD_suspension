@@ -1,14 +1,4 @@
 {
-    "material_assignation_table": [
-        [
-            "SpheresPart.DEMParts_ParticlesPart",
-            1
-        ],
-        [
-            "RigidFacePart.DEMWalls",
-            2
-        ]
-    ],
     "materials": [
         {
             "material_name": "DEM-Fluid",
@@ -131,5 +121,15 @@
                 "DAMPING_GAMMA": 0.0
             }
         }
+    ],
+    "material_assignation_table": [
+        [
+            "SpheresPart.DEMParts_ParticlesPart",
+            1
+        ],
+        [
+            "RigidFacePart.DEM-FEM-Wall_SlitWalls",
+            2
+        ]
     ]
 }
