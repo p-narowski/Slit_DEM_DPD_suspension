@@ -1,7 +1,13 @@
 {
     "material_assignation_table": [
-        ["Slit.DEMParts_ParticlesPart", 1],
-        ["Slit.DEMWalls", 2]
+        [
+            "SpheresPart.DEMParts_ParticlesPart",
+            1
+        ],
+        [
+            "RigidFacePart.DEMWalls",
+            2
+        ]
     ],
     "materials": [
         {
@@ -27,8 +33,14 @@
     ],
     "material_relations": [
         {
-            "material_names_list": ["DEM-Fluid", "DEM-Fluid"],
-            "material_ids_list": [1, 1],
+            "material_names_list": [
+                "DEM-Fluid",
+                "DEM-Fluid"
+            ],
+            "material_ids_list": [
+                1,
+                1
+            ],
             "Variables": {
                 "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_SPH_LIKE",
                 "PARTICLE_COHESION": 0.0,
@@ -47,8 +59,14 @@
             }
         },
         {
-            "material_names_list": ["DEM-Fluid", "DEM-Wall"],
-            "material_ids_list": [1, 2],
+            "material_names_list": [
+                "DEM-Fluid",
+                "DEM-Wall"
+            ],
+            "material_ids_list": [
+                1,
+                2
+            ],
             "Variables": {
                 "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_SPH_LIKE",
                 "PARTICLE_COHESION": 0.0,
@@ -67,8 +85,14 @@
             }
         },
         {
-            "material_names_list": ["DEM-Wall", "DEM-Fluid"],
-            "material_ids_list": [2, 1],
+            "material_names_list": [
+                "DEM-Wall",
+                "DEM-Fluid"
+            ],
+            "material_ids_list": [
+                2,
+                1
+            ],
             "Variables": {
                 "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_SPH_LIKE",
                 "PARTICLE_COHESION": 0.0,
@@ -87,8 +111,14 @@
             }
         },
         {
-            "material_names_list": ["DEM-Wall", "DEM-Wall"],
-            "material_ids_list": [2, 2],
+            "material_names_list": [
+                "DEM-Wall",
+                "DEM-Wall"
+            ],
+            "material_ids_list": [
+                2,
+                2
+            ],
             "Variables": {
                 "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_D_Hertz_viscous_Coulomb",
                 "PARTICLE_COHESION": 0.0,
