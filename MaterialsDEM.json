@@ -1,7 +1,7 @@
 {
     "material_assignation_table": [
-        ["DEMParts_ParticlesPart", 1],
-        ["DEMWalls", 2]
+        ["Slit.DEMParts_ParticlesPart", 1],
+        ["Slit.DEMWalls", 2]
     ],
     "materials": [
         {
