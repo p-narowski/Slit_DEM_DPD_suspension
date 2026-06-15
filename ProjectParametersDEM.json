@@ -13,13 +13,13 @@
     "BoundingBoxStartTime": 0.0,
     "BoundingBoxStopTime": 100.0,
     "dem_inlet_option": false,
-    "GravityX": 0.2,
+    "GravityX": 0.02,
     "GravityY": 0.0,
     "GravityZ": 0.0,
     "RotationOption": false,
-    "CleanIndentationsOption": false,
+    "CleanIndentationsOption": true,
     "solver_settings": {
-        "RemoveBallsInitiallyTouchingWalls": false,
+        "RemoveBallsInitiallyTouchingWalls": true,
         "strategy": "sphere_strategy",
         "material_import_settings": {
             "materials_filename": "MaterialsDEM.json"
@@ -35,7 +35,7 @@
     "TranslationalIntegrationScheme": "Symplectic_Euler",
     "RotationalIntegrationScheme": "Direct_Integration",
     "MaxTimeStep": 1e-4,
-    "FinalTime": 20.0,
+    "FinalTime": 1.0,
     "NeighbourSearchFrequency": 50,
     "SearchTolerance": 0.01,
     "GraphExportFreq": 0.0,
