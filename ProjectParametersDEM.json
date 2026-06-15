@@ -34,7 +34,7 @@
     "ElementType": "DPDParticle",
     "TranslationalIntegrationScheme": "Symplectic_Euler",
     "RotationalIntegrationScheme": "Direct_Integration",
-    "MaxTimeStep": 0.005,
+    "MaxTimeStep": 1e-4,
     "FinalTime": 20.0,
     "NeighbourSearchFrequency": 50,
     "SearchTolerance": 0.01,
