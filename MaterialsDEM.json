@@ -69,7 +69,7 @@
                 "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.12,
                 "DPD_CUTOFF_RADIUS": 0.12,
-                "DPD_CONSERVATIVE_COEFF": 15.0,
+                "DPD_CONSERVATIVE_COEFF": 40.0,
                 "DPD_DISSIPATIVE_COEFF_NORMAL": 50.0,
                 "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 100.0
             }
@@ -95,7 +95,7 @@
                 "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.12,
                 "DPD_CUTOFF_RADIUS": 0.12,
-                "DPD_CONSERVATIVE_COEFF": 15.0,
+                "DPD_CONSERVATIVE_COEFF": 40.0,
                 "DPD_DISSIPATIVE_COEFF_NORMAL": 50.0,
                 "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 100.0
             }
