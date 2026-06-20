@@ -148,6 +148,18 @@ def fit_parabola(z, ux):
     return fitted, coeffs
 
 
+def compute_slip_lengths(coeffs, z_max):
+    """Return (Ls_bottom, Ls_top) from parabola coefficients [a, b, c]."""
+    a, b, c = coeffs
+    u_bottom  = c
+    dudz_bottom = b
+    u_top     = np.polyval(coeffs, z_max)
+    dudz_top  = 2 * a * z_max + b
+    Ls_bottom = u_bottom  / dudz_bottom if abs(dudz_bottom) > 1e-12 else float('inf')
+    Ls_top    = u_top     / abs(dudz_top) if abs(dudz_top)  > 1e-12 else float('inf')
+    return Ls_bottom, Ls_top
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Time-averaged DPD velocity profile")
@@ -190,6 +202,11 @@ def main():
     print(f"\nParabola fit:  u_x(z) = {coeffs[0]:.4f}*z^2 "
           f"+ {coeffs[1]:.4f}*z + {coeffs[2]:.4f}")
 
+    Ls_bottom, Ls_top = compute_slip_lengths(coeffs, args.z_max)
+    print(f"\nSlip length  bottom wall (z=0):             Ls = {Ls_bottom:.5f}")
+    print(f"Slip length  top wall    (z={args.z_max}):  Ls = {Ls_top:.5f}")
+    print(f"Target: Ls < 0.01  (< 0.5 x particle radius)")
+
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
     ax.plot(mean_ux,  z_c, "o-", color="steelblue", label="Binned mean $u_x$")
@@ -197,10 +214,27 @@ def main():
     ax.set_xlabel("$u_x$ (sim units)")
     ax.set_ylabel("$z$ (gap direction)")
     ax.set_title(f"Time-averaged velocity profile\n"
-                 f"(t∈[{frames[0][0]:.1f},{frames[-1][0]:.1f}], "
+                 f"(t\u2208[{frames[0][0]:.1f},{frames[-1][0]:.1f}], "
                  f"{len(frames)} frames, {args.n_bins} bins)")
     ax.legend()
     ax.grid(True, alpha=0.3)
+
+    # Slip length annotation box
+    slip_text = (
+        f"Slip lengths (from fit):\n"
+        f"  bottom (z=0):      $L_s$ = {Ls_bottom:+.4f}\n"
+        f"  top    (z={args.z_max}):  $L_s$ = {Ls_top:+.4f}\n"
+        f"  target: $|L_s|$ < 0.01"
+    )
+    ax.text(
+        0.97, 0.05, slip_text,
+        transform=ax.transAxes,
+        fontsize=8,
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow",
+                  edgecolor="gray", alpha=0.85),
+    )
 
     ax2.bar(z_c, counts, width=(args.z_max - args.z_min) / args.n_bins,
             color="steelblue", alpha=0.6)
