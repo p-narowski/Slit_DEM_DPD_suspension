@@ -20,22 +20,20 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
     def ModifyBeforeSolutionLoop(self):
         super().ModifyBeforeSolutionLoop()
-        # Re-assign here so the solver re-binds law pointers AFTER our assignment
         self._assign_constitutive_laws()
 
     def _assign_constitutive_laws(self):
-        fluid_law  = "DEM_DPD_SPH_LIKE"
-        hertz_law  = "DEM_D_Hertz_viscous_Coulomb"
+        fluid_law = "DEM_DPD_SPH_LIKE"
+        hertz_law = "DEM_D_Hertz_viscous_Coulomb"
 
-        law_map = {1: fluid_law, 2: hertz_law}
+        law_map = {1: fluid_law, 2: hertz_law, 3: hertz_law}
 
         for prop in self.spheres_model_part.Properties:
             law = law_map.get(prop.Id)
             if law:
                 prop[KratosDEM.DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME] = law
-                print(f"[DBG] Prop {prop.Id} law → '{law}'")
+                print(f"[DBG] Prop {prop.Id} law -> '{law}'")
 
-        # Also cover wall model part
         for prop in self.rigid_face_model_part.Properties:
             law = law_map.get(prop.Id)
             if law:
@@ -53,14 +51,13 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
     def OutputSolutionStep(self):
         super().OutputSolutionStep()
-        # Only print at output steps (not every time step)
         max_f = 0.0
         for node in self.model.GetModelPart("SpheresPart").Nodes:
             f = node.GetSolutionStepValue(KratosMultiphysics.TOTAL_FORCES)
-            mag = (f[0]**2 + f[1]**2 + f[2]**2)**0.5
+            mag = (f[0] ** 2 + f[1] ** 2 + f[2] ** 2) ** 0.5
             if mag > max_f:
                 max_f = mag
-        #print(f"[t={self.time:.4f}] Max |TOTAL_FORCES| = {max_f:.6e}")
+        # print(f"[t={self.time:.4f}] Max |TOTAL_FORCES| = {max_f:.6e}")
 
 
 if __name__ == "__main__":
