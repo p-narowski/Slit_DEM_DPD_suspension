@@ -5,9 +5,6 @@ End ModelPartData
 Begin Properties 0
 End Properties
 
-Begin Properties 3
-End Properties
-
 Begin Nodes
        1  0.459018  0.876094  0.310171
        2  0.082889  0.241506  0.047525
@@ -59,7 +56,6 @@ Begin Nodes
       48  0.026417  0.861467  0.414693
       49  0.316973  0.046174  0.414313
       50  0.128404  0.843768  0.093520
-      51  0.456077  0.503055  0.023717
       52  0.085919  0.674646  0.225089
       53  0.722206  0.139114  0.170293
       54  0.270122  0.417623  0.015260
@@ -18013,10 +18009,6 @@ Begin Elements DPDParticle
     9000  0  9000
 End Elements
 
-Begin Elements SuspendedParticle
-  51  3  51
-End Elements
-
 Begin NodalData RADIUS // GUI group identifier: ParticlesPart
        1   0  0.02
        2   0  0.02
@@ -18068,7 +18060,6 @@ Begin NodalData RADIUS // GUI group identifier: ParticlesPart
       48   0  0.02
       49   0  0.02
       50   0  0.02
-      51   0  0.10
       52   0  0.02
       53   0  0.02
       54   0  0.02
@@ -45023,18 +45014,5 @@ Begin SubModelPart DEMParts_ParticlesPart // GUI group identifier: ParticlesPart
         8999
         9000
     End SubModelPartElements
-End SubModelPart
-
-Begin SubModelPart DEMParts_SuspendedPart
-    Begin SubModelPartData
-    End SubModelPartData
-    Begin SubModelPartNodes
-        51
-    End SubModelPartNodes
-    Begin SubModelPartElements
-        51
-    End SubModelPartElements
-    Begin SubModelPartConditions
-    End SubModelPartConditions
 End SubModelPart
 

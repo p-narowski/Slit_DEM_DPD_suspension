@@ -24,7 +24,7 @@
             "material_name": "DEM-Suspended",
             "material_id": 3,
             "Variables": {
-                "PARTICLE_DENSITY": 0.0000000001,
+                "PARTICLE_DENSITY": 1.0,
                 "YOUNG_MODULUS": 8.25e7,
                 "POISSON_RATIO": 0.42,
                 "PARTICLE_SPHERICITY": 1.0
@@ -125,7 +125,7 @@
                 "DPD_CONSERVATIVE_COEFF": 12.0,
                 "DPD_DISSIPATIVE_COEFF_NORMAL": 9.0,
                 "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 9.0,
-                "DPD_FLUID_VISCOSITY": 0.05
+                "DPD_FLUID_VISCOSITY": 1000.0
             }
         },
         {
@@ -146,7 +146,7 @@
                 "DPD_CONSERVATIVE_COEFF": 12.0,
                 "DPD_DISSIPATIVE_COEFF_NORMAL": 9.0,
                 "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 9.0,
-                "DPD_FLUID_VISCOSITY": 0.05
+                "DPD_FLUID_VISCOSITY": 1000.0
             }
         },
         {
@@ -198,6 +198,6 @@
     "material_assignation_table": [
         ["SpheresPart.DEMParts_ParticlesPart", 1],
         ["RigidFacePart.DEM-FEM-Wall_SlitWalls", 2],
-        ["SpheresPart.DEMParts_SuspendedPart", 3]
+        ["DEMInletPart.Inlet_SuspendedPart", 3]
     ]
 }

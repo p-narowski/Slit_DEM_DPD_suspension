@@ -1,0 +1,39 @@
+Begin ModelPartData
+//  VARIABLE_NAME value
+End ModelPartData
+
+Begin Properties 3
+End Properties
+
+Begin Nodes
+    51  0.456077  0.503055  0.23717
+End Nodes
+
+
+Begin SubModelPart Inlet_SuspendedPart // Group Inlet // Subtree Inlet
+    Begin SubModelPartData
+        RIGID_BODY_MOTION 0
+        //TABLE_VELOCITY_COMPONENT 0
+        IDENTIFIER Inlet_SuspendedPart
+        INJECTOR_ELEMENT_TYPE SuspendedParticle
+        ELEMENT_TYPE SuspendedParticle
+        CONTAINS_CLUSTERS 0
+        VELOCITY [3] (0.01, 0.0, 0.0)
+        MAX_RAND_DEVIATION_ANGLE 0.0
+        INLET_NUMBER_OF_PARTICLES 5
+        IMPOSED_MASS_FLOW_OPTION 0
+        INLET_START_TIME 0.0
+        INLET_STOP_TIME 1.0
+        RADIUS 0.05
+        PROBABILITY_DISTRIBUTION normal
+        STANDARD_DEVIATION 0.0
+    End SubModelPartData
+    Begin SubModelPartNodes
+      51
+    End SubModelPartNodes
+  End SubModelPart
+    
+  Begin Table 0 TIME VELOCITY
+  0.0  0.0
+  1.0  0.0
+  End Table

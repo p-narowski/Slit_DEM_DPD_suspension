@@ -12,7 +12,7 @@
     "BoundingBoxEnlargementFactor": 1.0,
     "BoundingBoxStartTime": 0.0,
     "BoundingBoxStopTime": 100.0,
-    "dem_inlet_option": false,
+    "dem_inlet_option": true,
     "GravityX": 0.02,
     "GravityY": 0.0,
     "GravityZ": 0.0,
