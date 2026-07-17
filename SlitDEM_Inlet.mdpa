@@ -15,8 +15,8 @@ Begin SubModelPart Inlet_SuspendedPart // Group Inlet // Subtree Inlet
         RIGID_BODY_MOTION 0
         //TABLE_VELOCITY_COMPONENT 0
         IDENTIFIER Inlet_SuspendedPart
-        INJECTOR_ELEMENT_TYPE DPDParticle
-        ELEMENT_TYPE DPDParticle
+        INJECTOR_ELEMENT_TYPE SphericParticle3D
+        ELEMENT_TYPE SphericParticle3D
         CONTAINS_CLUSTERS 0
         VELOCITY [3] (0.01, 0.0, 0.0)
         MAX_RAND_DEVIATION_ANGLE 0.0
