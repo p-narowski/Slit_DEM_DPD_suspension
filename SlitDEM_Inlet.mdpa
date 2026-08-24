@@ -23,7 +23,7 @@ Begin SubModelPart Inlet_SuspendedPart // Group Inlet // Subtree Inlet
         INLET_NUMBER_OF_PARTICLES 5
         IMPOSED_MASS_FLOW_OPTION 0
         INLET_START_TIME 0.0
-        INLET_STOP_TIME 1.0
+        INLET_STOP_TIME 5.0
         RADIUS 0.05
         PROBABILITY_DISTRIBUTION normal
         STANDARD_DEVIATION 0.0
