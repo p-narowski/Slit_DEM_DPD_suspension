@@ -154,8 +154,7 @@
                 "DPD_CUTOFF_RADIUS": 0.12,
                 "DPD_CONSERVATIVE_COEFF": 12.0,
                 "DPD_DISSIPATIVE_COEFF_NORMAL": 9.0,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 9.0,
-                "DPD_FLUID_VISCOSITY": 10000.0
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 9.0
             }
         },
         {
@@ -181,8 +180,7 @@
                 "DPD_CUTOFF_RADIUS": 0.12,
                 "DPD_CONSERVATIVE_COEFF": 12.0,
                 "DPD_DISSIPATIVE_COEFF_NORMAL": 9.0,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 9.0,
-                "DPD_FLUID_VISCOSITY": 10000.0
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL": 9.0
             }
         },
         {
