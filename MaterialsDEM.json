@@ -253,10 +253,6 @@
             1
         ],
         [
-            "RigidFacePart.DEM-FEM-Wall_SlitWalls",
-            2
-        ],
-        [
             "DEMInletPart.Inlet_SuspendedPart",
             3
         ]
