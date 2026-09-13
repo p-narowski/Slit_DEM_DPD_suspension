@@ -4,6 +4,7 @@ import sys
 import KratosMultiphysics
 from KratosMultiphysics.DEMApplication.DEM_analysis_stage import DEMAnalysisStage
 from KratosMultiphysics import Logger
+from momentum_tracker import MomentumTracker
 
 
 class DEMAnalysisStageWithFlush(DEMAnalysisStage):
@@ -47,9 +48,36 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         # Node IDs are retained only for concise diagnostic output.
         self.target_particle_ids = set()
+        
+        # -------------------------------------------------------------
+        # Momentum tracking settings
+        # -------------------------------------------------------------
+
+        # Time spacing for momentum samples. This should normally be
+        # larger than the explicit DEM time step to limit CSV size.
+        self.momentum_output_interval = 1.0e-4
+
+        # First sample time. It will be reset in Initialize().
+        self.next_momentum_output_time = 0.0
+
+        # Constructed in Initialize(), after SpheresPart exists.
+        self.momentum_tracker = None
 
     def Initialize(self):
         super(DEMAnalysisStageWithFlush, self).Initialize()
+        
+        particles_model_part = self._GetParticlesModelPart()
+
+        self.momentum_tracker = MomentumTracker(
+            particles_model_part,
+            output_directory=".",
+            suspended_radius_threshold=self.minimum_target_radius)
+
+        self.next_momentum_output_time = (
+            particles_model_part.ProcessInfo[
+                KratosMultiphysics.TIME])
+
+        self.momentum_tracker.Execute()
 
         print("---- DEBUG Initialize ----")
         print(
@@ -160,6 +188,22 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
     def FinalizeSolutionStep(self):
         super(DEMAnalysisStageWithFlush, self).FinalizeSolutionStep()
+        
+        current_simulation_time = self.spheres_model_part.ProcessInfo[KratosMultiphysics.TIME]
+
+        if (
+            self.momentum_tracker is not None
+            and current_simulation_time + 1.0e-15
+            >= self.next_momentum_output_time
+        ):
+            self.momentum_tracker.Execute()
+
+            while (
+                self.next_momentum_output_time
+                <= current_simulation_time + 1.0e-15
+            ):
+                self.next_momentum_output_time += (
+                    self.momentum_output_interval)
 
         if self.parallel_type == "OpenMP":
             now = time.time()
@@ -168,6 +212,12 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
                 sys.stdout.flush()
                 self.last_flush = now
 
+def Finalize(self):
+    if self.momentum_tracker is not None:
+        self.momentum_tracker.Execute()
+        self.momentum_tracker.Plot()
+
+    super(DEMAnalysisStageWithFlush, self).Finalize()
 
 if __name__ == "__main__":
     Logger.GetDefaultOutput().SetSeverity(Logger.Severity.INFO)
