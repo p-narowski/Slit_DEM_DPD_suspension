@@ -9,7 +9,6 @@ Begin Nodes
   1002  1.0  0.0  0.0
   1003  1.0  1.0  0.0
   1004  0.0  1.0  0.0
-
   1101  0.0  0.0  0.5
   1102  1.0  0.0  0.5
   1103  1.0  1.0  0.5
@@ -17,29 +16,10 @@ Begin Nodes
 End Nodes
 
 Begin Conditions RigidFace3D3N
-  // Bottom wall: z = 0, outward normal = -z
-  1   2  1001 1003 1002
-  2   2  1001 1004 1003
-
-  // Top wall: z = 0.5, outward normal = +z
-  3   2  1101 1102 1103
-  4   2  1101 1103 1104
-
-  // Front wall: y = 0, outward normal = -y
-  5   2  1001 1002 1102
-  6   2  1001 1102 1101
-
-  // Right wall: x = 1, outward normal = +x
-  7   2  1002 1003 1103
-  8   2  1002 1103 1102
-
-  // Back wall: y = 1, outward normal = +y
-  9   2  1003 1004 1104
-  10  2  1003 1104 1103
-
-  // Left wall: x = 0, outward normal = -x
-  11  2  1004 1001 1101
-  12  2  1004 1101 1104
+  1  2  1001 1002 1003
+  2  2  1001 1003 1004
+  3  2  1101 1102 1103
+  4  2  1101 1103 1104
 End Conditions
 
 Begin NodalData VELOCITY_X
@@ -77,12 +57,10 @@ End NodalData
 
 Begin SubModelPart DEM-FEM-Wall_SlitWalls
   Begin SubModelPartNodes
-    1001  1002  1003  1004
-    1101  1102  1103  1104
+    1001 1002 1003 1004
+    1101 1102 1103 1104
   End SubModelPartNodes
-
   Begin SubModelPartConditions
-    1  2  3  4  5  6
-    7  8  9  10  11  12
+    1 2 3 4
   End SubModelPartConditions
 End SubModelPart

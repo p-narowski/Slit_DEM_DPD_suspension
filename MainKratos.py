@@ -35,7 +35,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         # Example physical value for a sphere with:
         # R = 0.05 m, rho = 900 kg/m^3, g = 10 m/s^2:
         # F = rho * (4/3)*pi*R^3 * g = 4.71238898038 N.
-        self.driving_force_x = 0.00000000471238898038
+        self.driving_force_x = 0.01
 
         # Force direction / components.
         # The example below applies the force in +X only.
@@ -55,7 +55,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         # Time spacing for momentum samples. This should normally be
         # larger than the explicit DEM time step to limit CSV size.
-        self.momentum_output_interval = 1.0e-4
+        self.momentum_output_interval = 1.0e-2
 
         # First sample time. It will be reset in Initialize().
         self.next_momentum_output_time = 0.0
@@ -215,7 +215,6 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 def Finalize(self):
     if self.momentum_tracker is not None:
         self.momentum_tracker.Execute()
-        self.momentum_tracker.Plot()
 
     super(DEMAnalysisStageWithFlush, self).Finalize()
 

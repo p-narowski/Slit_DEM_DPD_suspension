@@ -1,0 +1,33 @@
+Total momentum component analysis
+=================================
+
+Number of samples: 6002
+Start time: 0
+End time: 60.00000000086826
+Simulation duration: 60.00000000086826
+
+D: Integrals over simulation time
+
+P_X component
+  Integral P_X dt = 1.518163569385641e-14
+  Final running average P_X = 2.530272615606119e-16
+  Integral d(average P_X)/dt dt = -4.707615945432833e-16
+  Change in average P_X = 2.530272615606119e-16
+  Direct change P_X(end)-P_X(start) = 1.182864570181685e-16
+  Final d(average P_X)/dt = -2.254876089093858e-19
+
+P_Y component
+  Integral P_Y dt = 2.668858747071258e-15
+  Final running average P_Y = 4.448097911721062e-17
+  Integral d(average P_Y)/dt dt = -8.864772489348404e-16
+  Change in average P_Y = 4.448097911721062e-17
+  Direct change P_Y(end)-P_Y(start) = -1.029341542557738e-15
+  Final d(average P_Y)/dt = -1.854523319247494e-17
+
+P_Z component
+  Integral P_Z dt = -4.809396381698166e-14
+  Final running average P_Z = -8.015660636047615e-16
+  Integral d(average P_Z)/dt dt = -9.797774612500112e-16
+  Change in average P_Z = -8.015660636047615e-16
+  Direct change P_Z(end)-P_Z(start) = -1.125401855039954e-15
+  Final d(average P_Z)/dt = -6.525921103396687e-18
