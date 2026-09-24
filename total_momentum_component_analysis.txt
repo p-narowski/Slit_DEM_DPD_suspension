@@ -9,25 +9,25 @@ Simulation duration: 60.00000000086826
 D: Integrals over simulation time
 
 P_X component
-  Integral P_X dt = 1.518163569385641e-14
-  Final running average P_X = 2.530272615606119e-16
-  Integral d(average P_X)/dt dt = -4.707615945432833e-16
-  Change in average P_X = 2.530272615606119e-16
-  Direct change P_X(end)-P_X(start) = 1.182864570181685e-16
-  Final d(average P_X)/dt = -2.254876089093858e-19
+  Integral P_X dt = 8556.935369784895
+  Final running average P_X = 142.6155894943511
+  Integral d(average P_X)/dt dt = 142.6159255627772
+  Change in average P_X = 142.6155894943511
+  Direct change P_X(end)-P_X(start) = 292.522043786355
+  Final d(average P_X)/dt = 2.498440644938621
 
 P_Y component
-  Integral P_Y dt = 2.668858747071258e-15
-  Final running average P_Y = 4.448097911721062e-17
-  Integral d(average P_Y)/dt dt = -8.864772489348404e-16
-  Change in average P_Y = 4.448097911721062e-17
-  Direct change P_Y(end)-P_Y(start) = -1.029341542557738e-15
-  Final d(average P_Y)/dt = -1.854523319247494e-17
+  Integral P_Y dt = 0.4719417628982489
+  Final running average P_Y = 0.007865696048190323
+  Integral d(average P_Y)/dt dt = 0.006108531195096299
+  Change in average P_Y = 0.007865696048190323
+  Direct change P_Y(end)-P_Y(start) = 0.007660682790757198
+  Final d(average P_Y)/dt = -3.417457199926882e-06
 
 P_Z component
-  Integral P_Z dt = -4.809396381698166e-14
-  Final running average P_Z = -8.015660636047615e-16
-  Integral d(average P_Z)/dt dt = -9.797774612500112e-16
-  Change in average P_Z = -8.015660636047615e-16
-  Direct change P_Z(end)-P_Z(start) = -1.125401855039954e-15
-  Final d(average P_Z)/dt = -6.525921103396687e-18
+  Integral P_Z dt = 0.9147009590108613
+  Final running average P_Z = 0.01524501598329374
+  Integral d(average P_Z)/dt dt = 0.01456179444653901
+  Change in average P_Z = 0.01524501598329374
+  Direct change P_Z(end)-P_Z(start) = 0.01542732679173314
+  Final d(average P_Z)/dt = 3.039019977234692e-06

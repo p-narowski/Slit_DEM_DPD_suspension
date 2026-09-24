@@ -1,372 +1,548 @@
 import csv
+import math
 import os
 
 import KratosMultiphysics as KM
+import KratosMultiphysics.DEMApplication as DEM
 
 
 class MomentumTracker:
     """
-    Tracks total linear momentum of free particles in a DEM model part.
+    Momentum tracker for a single parent particle model part.
 
-    The tracker writes:
-        momentum_history.csv
-        total_momentum_vs_time.png
+    Particle classification
+    -----------------------
+    DEM/suspended particles:
+        RADIUS >= suspended_radius_threshold
 
-    It reports momentum of all free particle nodes in the supplied model part:
+    DPD/fluid particles:
+        RADIUS < suspended_radius_threshold
 
-        P(t) = sum_i m_i v_i
+    Current capability
+    ------------------
+    This tracker computes and writes:
+        P_dem
+        P_dpd
+        P_total = P_dem + P_dpd
+        dP_total/dt
 
-    It also separately reports:
-        - total momentum of DPD particles,
-        - total momentum of large/suspended particles selected by radius,
-        - total prescribed external force on selected large particles.
+    It intentionally writes NaN for DEM-DPD coupling-force fields until
+    actual coupling-only force accumulators are supplied from the force-
+    assembly implementation.
 
-    The prescribed-force impulse is accumulated as:
-
-        J_ext(t) = integral F_ext dt
-
-    and the diagnostic residual is:
-
-        R(t) = P(t) - P(0) - J_ext(t)
-
-    This residual is meaningful for a closed system with no other external
-    influences. In the slit simulation, walls, inlet/outlet events, gravity,
-    and fixed constraints also contribute external momentum exchange.
+    Important:
+    TOTAL_FORCES must not be used as a substitute for DEM-DPD coupling
+    forces unless it is known to contain only that interaction. In this
+    simulation, TOTAL_FORCES may also contain prescribed external force,
+    wall force, gravity, DEM contact, or other terms.
     """
+
+    _HEADER = [
+        "step",
+        "time",
+        "dt",
+
+        "P_dem_x",
+        "P_dem_y",
+        "P_dem_z",
+
+        "P_dpd_x",
+        "P_dpd_y",
+        "P_dpd_z",
+
+        "P_total_x",
+        "P_total_y",
+        "P_total_z",
+
+        "F_external_x",
+        "F_external_y",
+        "F_external_z",
+
+        "F_wall_x",
+        "F_wall_y",
+        "F_wall_z",
+
+        "F_dpd_to_dem_x",
+        "F_dpd_to_dem_y",
+        "F_dpd_to_dem_z",
+
+        "F_dem_to_dpd_x",
+        "F_dem_to_dpd_y",
+        "F_dem_to_dpd_z",
+
+        "F_coupling_residual_x",
+        "F_coupling_residual_y",
+        "F_coupling_residual_z",
+        "F_coupling_residual_norm",
+
+        "dP_total_dt_x",
+        "dP_total_dt_y",
+        "dP_total_dt_z",
+
+        "F_expected_x",
+        "F_expected_y",
+        "F_expected_z",
+
+        "momentum_balance_error_x",
+        "momentum_balance_error_y",
+        "momentum_balance_error_z",
+        "momentum_balance_error_norm",
+    ]
 
     def __init__(
         self,
-        model_part,
+        particles_model_part,
         output_directory=".",
-        suspended_radius_threshold=0.049):
-        self.model_part = model_part
-        self.output_directory = output_directory
-        self.suspended_radius_threshold = suspended_radius_threshold
+        suspended_radius_threshold=0.0,
+        output_file_name="momentum_history.csv",
+        append=False,
+    ):
+        """
+        Parameters
+        ----------
+        particles_model_part
+            Parent model part containing both DPD particles and suspended
+            DEM particles. In the present case this is SpheresPart.
 
-        self.csv_file_name = os.path.join(
-            self.output_directory,
-            "momentum_history.csv")
+        output_directory : str
+            Directory where the CSV file will be written.
 
-        self.png_file_name = os.path.join(
-            self.output_directory,
-            "total_momentum_vs_time.png")
+        suspended_radius_threshold : float
+            Nodes with RADIUS >= this value are treated as DEM/suspended
+            particles. Nodes below this value are treated as DPD particles.
 
-        self.initial_total_momentum = None
-        self.previous_time = None
+        output_file_name : str
+            Name of output CSV file.
 
-        self.external_impulse = self._ZeroVector()
+        append : bool
+            If True, append to an existing CSV. Default False overwrites
+            the old history and writes a fresh header.
+        """
+        self._file = None
+        self._writer = None
 
-        self.times = []
+        self.particles_model_part = particles_model_part
+        self.suspended_radius_threshold = float(
+            suspended_radius_threshold
+        )
 
-        self.total_px_history = []
-        self.total_py_history = []
-        self.total_pz_history = []
-        self.total_pnorm_history = []
+        self._previous_time = None
+        self._previous_total_momentum = None
 
-        self.dpd_px_history = []
-        self.dpd_py_history = []
-        self.dpd_pz_history = []
-        self.dpd_pnorm_history = []
+        if output_directory is None:
+            output_directory = "."
 
-        self.suspended_px_history = []
-        self.suspended_py_history = []
-        self.suspended_pz_history = []
-        self.suspended_pnorm_history = []
+        os.makedirs(output_directory, exist_ok=True)
 
-        self.external_fx_history = []
-        self.external_fy_history = []
-        self.external_fz_history = []
+        self.output_file_name = os.path.join(
+            output_directory,
+            output_file_name,
+        )
 
-        self.residual_x_history = []
-        self.residual_y_history = []
-        self.residual_z_history = []
-        self.residual_norm_history = []
+        mode = "a" if append else "w"
 
-        self._CreateOutputFile()
+        file_is_empty = (
+            not os.path.exists(self.output_file_name)
+            or os.path.getsize(self.output_file_name) == 0
+        )
 
-    def _ZeroVector(self):
-        vector = KM.Array3()
-        vector[0] = 0.0
-        vector[1] = 0.0
-        vector[2] = 0.0
-        return vector
+        self._file = open(
+            self.output_file_name,
+            mode,
+            newline="",
+        )
 
-    def _CopyVector(self, vector):
-        copied_vector = self._ZeroVector()
-        copied_vector[0] = vector[0]
-        copied_vector[1] = vector[1]
-        copied_vector[2] = vector[2]
-        return copied_vector
+        self._writer = csv.DictWriter(
+            self._file,
+            fieldnames=self._HEADER,
+        )
 
-    def _VectorNorm(self, vector):
-        return (
+        if not append or file_is_empty:
+            self._writer.writeheader()
+            self._file.flush()
+
+    @staticmethod
+    def _zero():
+        return [0.0, 0.0, 0.0]
+
+    @staticmethod
+    def _nan_vector():
+        return [float("nan"), float("nan"), float("nan")]
+
+    @staticmethod
+    def _as_list(vector):
+        return [
+            float(vector[0]),
+            float(vector[1]),
+            float(vector[2]),
+        ]
+
+    @staticmethod
+    def _add(a, b):
+        return [
+            a[0] + b[0],
+            a[1] + b[1],
+            a[2] + b[2],
+        ]
+
+    @staticmethod
+    def _subtract(a, b):
+        return [
+            a[0] - b[0],
+            a[1] - b[1],
+            a[2] - b[2],
+        ]
+
+    @staticmethod
+    def _scale(vector, scalar):
+        return [
+            scalar * vector[0],
+            scalar * vector[1],
+            scalar * vector[2],
+        ]
+
+    @staticmethod
+    def _norm(vector):
+        return math.sqrt(
             vector[0] * vector[0]
             + vector[1] * vector[1]
             + vector[2] * vector[2]
-        ) ** 0.5
-
-    def _AddScaledVector(self, destination, source, scale):
-        destination[0] += scale * source[0]
-        destination[1] += scale * source[1]
-        destination[2] += scale * source[2]
-
-    def _AddVector(self, destination, source):
-        destination[0] += source[0]
-        destination[1] += source[1]
-        destination[2] += source[2]
-
-    def _IsFreeParticleNode(self, node):
-        return not (
-            node.IsFixed(KM.VELOCITY_X)
-            or node.IsFixed(KM.VELOCITY_Y)
-            or node.IsFixed(KM.VELOCITY_Z)
         )
 
-    def _GetNodeMass(self, node):
-        mass = node.GetSolutionStepValue(KM.NODAL_MASS)
+    @staticmethod
+    def _write_vector(row, prefix, vector):
+        row[prefix + "_x"] = vector[0]
+        row[prefix + "_y"] = vector[1]
+        row[prefix + "_z"] = vector[2]
 
-        if mass <= 0.0:
+    def _is_dem_particle(self, node):
+        return node.Is(DEM.DEMFlags.IS_SUSPENDED_PARTICLE)
+
+    @staticmethod
+    def _get_nodal_mass(node):
+        """
+        Obtain the mass used by the particle time integration.
+
+        NODAL_MASS is expected for this DEM/DPD setup. The alternatives are
+        retained to make failure messages clearer if a variable is stored
+        non-historically instead.
+        """
+        if node.SolutionStepsDataHas(KM.NODAL_MASS):
+            return float(
+                node.GetSolutionStepValue(KM.NODAL_MASS)
+            )
+
+        if node.SolutionStepsDataHas(KM.MASS):
+            return float(
+                node.GetSolutionStepValue(KM.MASS)
+            )
+
+        if node.Has(KM.NODAL_MASS):
+            return float(node.GetValue(KM.NODAL_MASS))
+
+        if node.Has(KM.MASS):
+            return float(node.GetValue(KM.MASS))
+
+        raise RuntimeError(
+            "Could not find NODAL_MASS or MASS on node {}. "
+            "Update _get_nodal_mass() to use the mass variable used by "
+            "your particle formulation.".format(node.Id)
+        )
+
+    @staticmethod
+    def _get_nodal_velocity(node):
+        if node.SolutionStepsDataHas(KM.VELOCITY):
+            return MomentumTracker._as_list(
+                node.GetSolutionStepValue(KM.VELOCITY)
+            )
+
+        if node.Has(KM.VELOCITY):
+            return MomentumTracker._as_list(
+                node.GetValue(KM.VELOCITY)
+            )
+
+        raise RuntimeError(
+            "Could not find VELOCITY on node {}.".format(node.Id)
+        )
+
+    def _split_momentum(self):
+        """
+        Return P_dem and P_dpd by summing m*v over the relevant nodes.
+        """
+        p_dem = self._zero()
+        p_dpd = self._zero()
+
+        for node in self.particles_model_part.Nodes:
+            mass = self._get_nodal_mass(node)
+            velocity = self._get_nodal_velocity(node)
+            particle_momentum = self._scale(velocity, mass)
+
+            if self._is_dem_particle(node):
+                p_dem = self._add(p_dem, particle_momentum)
+            else:
+                p_dpd = self._add(p_dpd, particle_momentum)
+
+        return p_dem, p_dpd
+
+    def _get_time(self):
+        process_info = self.particles_model_part.ProcessInfo
+
+        if not process_info.Has(KM.TIME):
             raise RuntimeError(
-                "Node {} has non-positive NODAL_MASS = {}. "
-                "Momentum cannot be evaluated.".format(
-                    node.Id,
-                    mass))
+                "TIME was not found in particles_model_part.ProcessInfo."
+            )
 
-        return mass
+        return float(process_info[KM.TIME])
 
-    def _IsSuspendedParticle(self, node):
-        radius = node.GetSolutionStepValue(KM.RADIUS)
-        return radius >= self.suspended_radius_threshold
+    def _get_step(self):
+        process_info = self.particles_model_part.ProcessInfo
 
-    def _IsDPDParticle(self, node):
-        return not self._IsSuspendedParticle(node)
+        if process_info.Has(KM.STEP):
+            return int(process_info[KM.STEP])
 
-    def _GetExternalAppliedForce(self, node):
-        force = self._ZeroVector()
+        return -1
 
-        try:
-            nodal_force = node.GetSolutionStepValue(
-                KM.EXTERNAL_APPLIED_FORCE)
+    def _sum_external_applied_force_on_dem(self):
+        """
+        Sum the prescribed external force stored on selected DEM nodes.
 
-            force[0] = nodal_force[0]
-            force[1] = nodal_force[1]
-            force[2] = nodal_force[2]
+        This is meaningful for your current MainKratos.py because it sets
+        EXTERNAL_APPLIED_FORCE on every radius-selected target particle.
 
-        except RuntimeError:
-            pass
+        It does not include gravity unless gravity has separately been added
+        into EXTERNAL_APPLIED_FORCE by your simulation setup.
+        """
+        total_external_force = self._zero()
 
-        return force
-
-    def _CreateOutputFile(self):
-        with open(self.csv_file_name, "w", newline="") as csv_file:
-            writer = csv.writer(csv_file)
-
-            writer.writerow([
-                "time",
-
-                "number_of_free_particles",
-                "number_of_dpd_particles",
-                "number_of_suspended_particles",
-
-                "total_mass",
-                "dpd_mass",
-                "suspended_mass",
-
-                "total_px",
-                "total_py",
-                "total_pz",
-                "total_pnorm",
-
-                "dpd_px",
-                "dpd_py",
-                "dpd_pz",
-                "dpd_pnorm",
-
-                "suspended_px",
-                "suspended_py",
-                "suspended_pz",
-                "suspended_pnorm",
-
-                "external_fx",
-                "external_fy",
-                "external_fz",
-
-                "external_impulse_x",
-                "external_impulse_y",
-                "external_impulse_z",
-
-                "momentum_residual_x",
-                "momentum_residual_y",
-                "momentum_residual_z",
-                "momentum_residual_norm"
-            ])
-
-    def Execute(self):
-        current_time = self.model_part.ProcessInfo[KM.TIME]
-
-        total_momentum = self._ZeroVector()
-        dpd_momentum = self._ZeroVector()
-        suspended_momentum = self._ZeroVector()
-
-        total_external_force = self._ZeroVector()
-
-        total_mass = 0.0
-        dpd_mass = 0.0
-        suspended_mass = 0.0
-
-        number_of_free_particles = 0
-        number_of_dpd_particles = 0
-        number_of_suspended_particles = 0
-
-        for node in self.model_part.Nodes:
-            if not self._IsFreeParticleNode(node):
+        for node in self.particles_model_part.Nodes:
+            if not self._is_dem_particle(node):
                 continue
 
-            mass = self._GetNodeMass(node)
+            if node.SolutionStepsDataHas(KM.EXTERNAL_APPLIED_FORCE):
+                force = node.GetSolutionStepValue(
+                    KM.EXTERNAL_APPLIED_FORCE
+                )
+                total_external_force = self._add(
+                    total_external_force,
+                    self._as_list(force),
+                )
 
-            velocity = node.GetSolutionStepValue(KM.VELOCITY)
+            elif node.Has(KM.EXTERNAL_APPLIED_FORCE):
+                force = node.GetValue(KM.EXTERNAL_APPLIED_FORCE)
+                total_external_force = self._add(
+                    total_external_force,
+                    self._as_list(force),
+                )
 
-            self._AddScaledVector(
-                total_momentum,
-                velocity,
-                mass)
+        return total_external_force
 
-            total_mass += mass
-            number_of_free_particles += 1
+    def record(
+        self,
+        dem_dpd_force_on_dem=None,
+        dem_dpd_force_on_dpd=None,
+        external_force_on_system=None,
+        wall_force_on_system=None,
+    ):
+        """
+        Write one row of momentum diagnostics.
 
-            external_force = self._GetExternalAppliedForce(node)
+        Parameters
+        ----------
+        dem_dpd_force_on_dem : length-3 sequence or None
+            Sum of coupling-only forces exerted by DPD particles on DEM
+            particles. Until a real coupling accumulator is connected,
+            leave as None. The CSV then writes NaN.
 
-            self._AddVector(
-                total_external_force,
-                external_force)
+        dem_dpd_force_on_dpd : length-3 sequence or None
+            Sum of reaction coupling-only forces exerted by DEM particles on
+            DPD particles. Until a real accumulator is connected, leave as
+            None. The CSV then writes NaN.
 
-            if self._IsSuspendedParticle(node):
-                self._AddScaledVector(
-                    suspended_momentum,
-                    velocity,
-                    mass)
+        external_force_on_system : length-3 sequence or None
+            Net known external force on the full DEM+DPD system. If None,
+            this tracker sums EXTERNAL_APPLIED_FORCE on DEM-selected nodes.
 
-                suspended_mass += mass
-                number_of_suspended_particles += 1
+        wall_force_on_system : length-3 sequence or None
+            Net force applied by walls to DEM+DPD. Leave as None until it is
+            explicitly measured; the corresponding global-balance fields
+            will then be written as NaN.
+        """
+        time = self._get_time()
+        step = self._get_step()
 
+        p_dem, p_dpd = self._split_momentum()
+        p_total = self._add(p_dem, p_dpd)
+
+        if external_force_on_system is None:
+            f_external = self._sum_external_applied_force_on_dem()
+        else:
+            f_external = self._as_list(external_force_on_system)
+
+        wall_force_is_available = wall_force_on_system is not None
+
+        if wall_force_is_available:
+            f_wall = self._as_list(wall_force_on_system)
+            f_expected = self._add(f_external, f_wall)
+        else:
+            f_wall = self._nan_vector()
+            f_expected = self._nan_vector()
+
+        coupling_forces_are_available = (
+            dem_dpd_force_on_dem is not None
+            and dem_dpd_force_on_dpd is not None
+        )
+
+        if coupling_forces_are_available:
+            f_dpd_to_dem = self._as_list(dem_dpd_force_on_dem)
+            f_dem_to_dpd = self._as_list(dem_dpd_force_on_dpd)
+
+            f_coupling_residual = self._add(
+                f_dpd_to_dem,
+                f_dem_to_dpd,
+            )
+
+            f_coupling_residual_norm = self._norm(
+                f_coupling_residual
+            )
+        else:
+            f_dpd_to_dem = self._nan_vector()
+            f_dem_to_dpd = self._nan_vector()
+            f_coupling_residual = self._nan_vector()
+            f_coupling_residual_norm = float("nan")
+
+        if self._previous_time is None:
+            dt = 0.0
+            dp_total_dt = self._nan_vector()
+            momentum_balance_error = self._nan_vector()
+            momentum_balance_error_norm = float("nan")
+        else:
+            dt = time - self._previous_time
+
+            if dt <= 0.0:
+                raise RuntimeError(
+                    "Non-positive diagnostic timestep: current time = {}, "
+                    "previous time = {}.".format(
+                        time,
+                        self._previous_time,
+                    )
+                )
+
+            dp_total_dt = self._scale(
+                self._subtract(
+                    p_total,
+                    self._previous_total_momentum,
+                ),
+                1.0 / dt,
+            )
+
+            if wall_force_is_available:
+                momentum_balance_error = self._subtract(
+                    dp_total_dt,
+                    f_expected,
+                )
+
+                momentum_balance_error_norm = self._norm(
+                    momentum_balance_error
+                )
             else:
-                self._AddScaledVector(
-                    dpd_momentum,
-                    velocity,
-                    mass)
+                momentum_balance_error = self._nan_vector()
+                momentum_balance_error_norm = float("nan")
 
-                dpd_mass += mass
-                number_of_dpd_particles += 1
+        row = {
+            "step": step,
+            "time": time,
+            "dt": dt,
+            "F_coupling_residual_norm": f_coupling_residual_norm,
+            "momentum_balance_error_norm": (
+                momentum_balance_error_norm
+            ),
+        }
 
-        if self.initial_total_momentum is None:
-            self.initial_total_momentum = self._CopyVector(
-                total_momentum)
+        self._write_vector(row, "P_dem", p_dem)
+        self._write_vector(row, "P_dpd", p_dpd)
+        self._write_vector(row, "P_total", p_total)
 
-        if self.previous_time is not None:
-            delta_time = current_time - self.previous_time
+        self._write_vector(row, "F_external", f_external)
+        self._write_vector(row, "F_wall", f_wall)
 
-            self._AddScaledVector(
-                self.external_impulse,
-                total_external_force,
-                delta_time)
+        self._write_vector(row, "F_dpd_to_dem", f_dpd_to_dem)
+        self._write_vector(row, "F_dem_to_dpd", f_dem_to_dpd)
 
-        momentum_residual = self._ZeroVector()
+        self._write_vector(
+            row,
+            "F_coupling_residual",
+            f_coupling_residual,
+        )
 
-        momentum_residual[0] = (
-            total_momentum[0]
-            - self.initial_total_momentum[0]
-            - self.external_impulse[0])
+        self._write_vector(row, "dP_total_dt", dp_total_dt)
+        self._write_vector(row, "F_expected", f_expected)
 
-        momentum_residual[1] = (
-            total_momentum[1]
-            - self.initial_total_momentum[1]
-            - self.external_impulse[1])
+        self._write_vector(
+            row,
+            "momentum_balance_error",
+            momentum_balance_error,
+        )
 
-        momentum_residual[2] = (
-            total_momentum[2]
-            - self.initial_total_momentum[2]
-            - self.external_impulse[2])
+        self._writer.writerow(row)
+        self._file.flush()
 
-        self.times.append(current_time)
+        self._previous_time = time
+        self._previous_total_momentum = p_total[:]
+    def _sum_coupling_variable(
+        self,
+        variable,
+        select_dem_particles,
+):
+        total = self._zero()
 
-        self.total_px_history.append(total_momentum[0])
-        self.total_py_history.append(total_momentum[1])
-        self.total_pz_history.append(total_momentum[2])
-        self.total_pnorm_history.append(
-            self._VectorNorm(total_momentum))
+        for node in self.particles_model_part.Nodes:
+            if self._is_dem_particle(node) != select_dem_particles:
+                continue
 
-        self.dpd_px_history.append(dpd_momentum[0])
-        self.dpd_py_history.append(dpd_momentum[1])
-        self.dpd_pz_history.append(dpd_momentum[2])
-        self.dpd_pnorm_history.append(
-            self._VectorNorm(dpd_momentum))
+            value = node.GetSolutionStepValue(variable)
 
-        self.suspended_px_history.append(
-            suspended_momentum[0])
-        self.suspended_py_history.append(
-            suspended_momentum[1])
-        self.suspended_pz_history.append(
-            suspended_momentum[2])
-        self.suspended_pnorm_history.append(
-            self._VectorNorm(suspended_momentum))
+            total = self._add(
+                total,
+                self._as_list(value),
+            )
 
-        self.external_fx_history.append(
-            total_external_force[0])
-        self.external_fy_history.append(
-            total_external_force[1])
-        self.external_fz_history.append(
-            total_external_force[2])
+        return total
 
-        self.residual_x_history.append(
-            momentum_residual[0])
-        self.residual_y_history.append(
-            momentum_residual[1])
-        self.residual_z_history.append(
-            momentum_residual[2])
-        self.residual_norm_history.append(
-            self._VectorNorm(momentum_residual))
 
-        with open(self.csv_file_name, "a", newline="") as csv_file:
-            writer = csv.writer(csv_file)
+    def _get_coupling_force_totals(self):
+        f_dpd_to_dem = self._sum_coupling_variable(
+            DEM.DPD_TO_DEM_COUPLING_FORCE,
+            select_dem_particles=True,
+        )
 
-            writer.writerow([
-                current_time,
+        f_dem_to_dpd = self._sum_coupling_variable(
+            DEM.DEM_TO_DPD_COUPLING_FORCE,
+            select_dem_particles=False,
+        )
 
-                number_of_free_particles,
-                number_of_dpd_particles,
-                number_of_suspended_particles,
+        return f_dpd_to_dem, f_dem_to_dpd
+    
+    def Execute(self):
+        f_dpd_to_dem, f_dem_to_dpd = (
+            self._get_coupling_force_totals()
+        )
 
-                total_mass,
-                dpd_mass,
-                suspended_mass,
+        self.record(
+            dem_dpd_force_on_dem=f_dpd_to_dem,
+            dem_dpd_force_on_dpd=f_dem_to_dpd,
+            external_force_on_system=None,
+            wall_force_on_system=None,
+        )
 
-                total_momentum[0],
-                total_momentum[1],
-                total_momentum[2],
-                self._VectorNorm(total_momentum),
+    def close(self):
+        """
+        Close the CSV safely, including if __init__ failed partway through.
+        """
+        file_handle = getattr(self, "_file", None)
 
-                dpd_momentum[0],
-                dpd_momentum[1],
-                dpd_momentum[2],
-                self._VectorNorm(dpd_momentum),
+        if file_handle is not None:
+            file_handle.close()
+            self._file = None
 
-                suspended_momentum[0],
-                suspended_momentum[1],
-                suspended_momentum[2],
-                self._VectorNorm(suspended_momentum),
-
-                total_external_force[0],
-                total_external_force[1],
-                total_external_force[2],
-
-                self.external_impulse[0],
-                self.external_impulse[1],
-                self.external_impulse[2],
-
-                momentum_residual[0],
-                momentum_residual[1],
-                momentum_residual[2],
-                self._VectorNorm(momentum_residual)
-            ])
-
-        self.previous_time = current_time
+    def __del__(self):
+        self.close()

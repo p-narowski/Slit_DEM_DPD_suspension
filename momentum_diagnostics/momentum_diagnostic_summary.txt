@@ -1,0 +1,29 @@
+DEM-DPD momentum-conservation diagnostic summary
+===============================================
+
+Input CSV: momentum_history.csv
+Number of timesteps: 6002
+Time interval: [0.0000000000000000e+00, 6.0000000000868262e+01]
+
+Forcing direction used for scalar projections:
+  [1.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00]
+
+Coupling action-reaction check
+------------------------------
+max ||F_DPD->DEM + F_DEM->DPD|| = nan
+RMS ||F_DPD->DEM + F_DEM->DPD|| = nan
+Force residual tolerance = 1.0000000000000000e-10
+Force residual status = CHECK
+
+Global total-momentum check
+---------------------------
+Fitted dP_total/dt in forcing direction = 4.9906263008406562e+00
+Mean expected force in forcing direction = nan
+Slope minus expected force = nan
+
+Per-step momentum-rate balance
+------------------------------
+max ||dP_total/dt - F_expected|| = nan
+RMS ||dP_total/dt - F_expected|| = nan
+Momentum-rate tolerance = 1.0000000000000000e-08
+Momentum-rate status = CHECK

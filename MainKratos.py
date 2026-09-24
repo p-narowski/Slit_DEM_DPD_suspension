@@ -35,7 +35,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         # Example physical value for a sphere with:
         # R = 0.05 m, rho = 900 kg/m^3, g = 10 m/s^2:
         # F = rho * (4/3)*pi*R^3 * g = 4.71238898038 N.
-        self.driving_force_x = 0.01
+        self.driving_force_x = 5.0
 
         # Force direction / components.
         # The example below applies the force in +X only.

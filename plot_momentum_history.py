@@ -20,11 +20,10 @@ def trapezoidal_integral(values, time):
 def read_momentum_history(csv_file_name):
     required_columns = [
         "time",
-        "total_px",
-        "total_py",
-        "total_pz",
+        "P_total_x",
+        "P_total_y",
+        "P_total_z",
     ]
-
     rows = []
 
     with open(csv_file_name, "r", newline="") as csv_file:
@@ -57,9 +56,9 @@ def read_momentum_history(csv_file_name):
                 rows.append(
                     (
                         float(row["time"]),
-                        float(row["total_px"]),
-                        float(row["total_py"]),
-                        float(row["total_pz"]),
+                        float(row["P_total_x"]),
+                        float(row["P_total_y"]),
+                        float(row["P_total_z"]),
                     )
                 )
             except (TypeError, ValueError) as error:
