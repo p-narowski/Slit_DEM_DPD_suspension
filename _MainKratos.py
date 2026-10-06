@@ -4,11 +4,16 @@ import sys
 import KratosMultiphysics
 from KratosMultiphysics.DEMApplication.DEM_analysis_stage import DEMAnalysisStage
 from KratosMultiphysics import Logger
+from momentum_tracker import MomentumTracker
 
 
 class DEMAnalysisStageWithFlush(DEMAnalysisStage):
+
     def __init__(self, model, project_parameters, flush_frequency=10.0):
-        super(DEMAnalysisStageWithFlush, self).__init__(model, project_parameters)
+        super(DEMAnalysisStageWithFlush, self).__init__(
+            model,
+            project_parameters
+        )
 
         self.flush_frequency = flush_frequency
         self.last_flush = time.time()
@@ -17,116 +22,188 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         # User settings
         # -------------------------------------------------------------
 
-        # Node ID of the SphericParticle3D that must move.
-        # Obtain it from the "Begin Nodes" section in SlitDEM.mdpa.
-        self.target_solid_particle_id = 51
+        # Apply the specified force to every particle with:
+        # RADIUS >= minimum_target_radius
+        #
+        # Choose a value larger than every DPD-fluid particle radius and
+        # less than or equal to the radius of all intended solid particles.
+        self.minimum_target_radius = 0.049
 
-        # Gravity magnitude in your consistent model units.
-        self.gravity_acceleration = 10.0
+        # Prescribed force applied to EACH selected large particle.
+        # Units must be consistent with your Kratos model units.
+        #
+        # Example physical value for a sphere with:
+        # R = 0.05 m, rho = 900 kg/m^3, g = 10 m/s^2:
+        # F = rho * (4/3)*pi*R^3 * g = 4.71238898038 N.
+        self.driving_force_x = 1.0
 
-        # Force direction:
-        # -z direction: [0.0, 0.0, -1.0]
-        # -y direction: [0.0, -1.0, 0.0]
-        self.gravity_direction = KratosMultiphysics.Array3()
-        self.gravity_direction[0] = 1.0
-        self.gravity_direction[1] = 0.0
-        self.gravity_direction[2] = 0.0
+        # Force direction / components.
+        # The example below applies the force in +X only.
+        self.driving_force_y = 0.0
+        self.driving_force_z = 0.0
 
-        self.target_solid_node = None
-        self.target_solid_force = KratosMultiphysics.Array3()
-        self.target_solid_force[0] = 1.0
-        self.target_solid_force[1] = 0.0
-        self.target_solid_force[2] = 0.0
+        # Parent part containing both DPD particles and inlet-generated
+        # SphericParticle3D particles.
+        self.particles_model_part_name = "SpheresPart"
+
+        # Node IDs are retained only for concise diagnostic output.
+        self.target_particle_ids = set()
+        
+        # -------------------------------------------------------------
+        # Momentum tracking settings
+        # -------------------------------------------------------------
+
+        # Time spacing for momentum samples. This should normally be
+        # larger than the explicit DEM time step to limit CSV size.
+        self.momentum_output_interval = 1.0e-2
+
+        # First sample time. It will be reset in Initialize().
+        self.next_momentum_output_time = 0.0
+
+        # Constructed in Initialize(), after SpheresPart exists.
+        self.momentum_tracker = None
 
     def Initialize(self):
         super(DEMAnalysisStageWithFlush, self).Initialize()
+        
+        particles_model_part = self._GetParticlesModelPart()
 
-        self.target_solid_node = self._GetTargetSolidParticle()
+        self.momentum_tracker = MomentumTracker(
+            particles_model_part,
+            output_directory=".",
+            suspended_radius_threshold=self.minimum_target_radius)
 
-        self.target_solid_force = self._CalculateGravityForce(self.target_solid_node)
+        self.next_momentum_output_time = (
+            particles_model_part.ProcessInfo[
+                KratosMultiphysics.TIME])
+
+        self.momentum_tracker.Execute()
 
         print("---- DEBUG Initialize ----")
-        for name in self.model.GetModelPartNames():
-            print("model part:", name)
-
-        print("target solid particle node id:", self.target_solid_particle_id)
-
-        print("target solid particle F = m*g:", self.target_solid_force)
-
-    def _GetTargetSolidParticle(self):
-        self.solid_part_name = "DEMInletPart.Inlet_SuspendedPart"
-
-        if not self.model.HasModelPart(self.solid_part_name):
-            raise RuntimeError(
-                "Solid inlet model part '{}' was not found. "
-                "Print self.model.GetModelPartNames() and verify its exact name."
-                .format(self.solid_part_name)
+        print(
+            "Radius-selection criterion: RADIUS >= {}"
+            .format(self.minimum_target_radius)
+        )
+        print(
+            "External force per selected particle: [{}, {}, {}]"
+            .format(
+                self.driving_force_x,
+                self.driving_force_y,
+                self.driving_force_z
             )
+        )
 
-        solid_part = self.model.GetModelPart(self.solid_part_name)
+        print("Model parts:")
+        for name in self.model.GetModelPartNames():
+            print("  ", name)
 
-        if solid_part.NumberOfNodes() != 1:
+    def _GetParticlesModelPart(self):
+        if not self.model.HasModelPart(self.particles_model_part_name):
             raise RuntimeError(
-                "Expected one solid particle in '{}', but found {} nodes."
-                .format(
-                    self.solid_part_name,
-                    solid_part.NumberOfNodes()
+                "Particle model part '{}' was not found. Available model "
+                "parts are: {}".format(
+                    self.particles_model_part_name,
+                    list(self.model.GetModelPartNames())
                 )
             )
 
-        node = next(iter(solid_part.Nodes))
+        return self.model.GetModelPart(self.particles_model_part_name)
 
-        print("Selected particle model part:", self.solid_part_name)
-        print("Selected particle node ID:", node.Id)
+    def _GetTargetParticles(self):
+        particles_model_part = self._GetParticlesModelPart()
 
-        return node
+        target_particles = []
 
+        for node in particles_model_part.Nodes:
+            radius = node.GetSolutionStepValue(
+                KratosMultiphysics.RADIUS
+            )
 
-    def _CalculateGravityForce(self, node):
-        mass = node.GetSolutionStepValue(KratosMultiphysics.NODAL_MASS)
+            if radius >= self.minimum_target_radius:
+                target_particles.append(node)
+
+        return target_particles
+
+    def _ApplyForceToTargetParticles(self):
+        target_particles = self._GetTargetParticles()
 
         force = KratosMultiphysics.Array3()
-        force[0] = mass * self.gravity_acceleration
-        force[1] = 0.0
-        force[2] = 0.0
-        
-        radius = node.GetSolutionStepValue(KratosMultiphysics.RADIUS)
+        force[0] = self.driving_force_x
+        force[1] = self.driving_force_y
+        force[2] = self.driving_force_z
 
-        print("Target radius:", radius)
-        print("Target NODAL_MASS:", mass)
-        print(
-            "Density inferred from nodal mass:",
-            mass / ((4.0 / 3.0) * 3.141592653589793 * radius**3)
-        )
+        current_ids = set()
 
-        return force
+        for node in target_particles:
+            node.SetSolutionStepValue(
+                KratosMultiphysics.EXTERNAL_APPLIED_FORCE,
+                force
+            )
+            current_ids.add(node.Id)
 
-    def _ApplyGravityForceToTargetSolidParticle(self):
-        self.target_solid_node.SetSolutionStepValue(
-            KratosMultiphysics.EXTERNAL_APPLIED_FORCE, self.target_solid_force
-        )
+        newly_detected = current_ids - self.target_particle_ids
+
+        for node_id in sorted(newly_detected):
+            node = self._GetParticlesModelPart().GetNode(node_id)
+            radius = node.GetSolutionStepValue(
+                KratosMultiphysics.RADIUS
+            )
+            mass = node.GetSolutionStepValue(
+                KratosMultiphysics.NODAL_MASS
+            )
+
+            print(
+                "Selected large particle: "
+                "node ID = {}, R = {}, mass = {}, force = [{}, {}, {}]"
+                .format(
+                    node_id,
+                    radius,
+                    mass,
+                    self.driving_force_x,
+                    self.driving_force_y,
+                    self.driving_force_z
+                )
+            )
+
+        self.target_particle_ids = current_ids
+
+        return len(target_particles)
 
     def InitializeSolutionStep(self):
         super(DEMAnalysisStageWithFlush, self).InitializeSolutionStep()
-        
-        if self.target_solid_node is None:
-            self.target_solid_node = self._GetTargetSolidParticle()
-            self.target_solid_force = self._CalculateGravityForce(
-                self.target_solid_node
-            )
-        # Apply force only to the selected SphericParticle3D.
-        # No force is assigned to the DPD particles.
-        self._ApplyGravityForceToTargetSolidParticle()
 
-        print(
-            "target solid particle external force:",
-            self.target_solid_node.GetSolutionStepValue(
-                KratosMultiphysics.EXTERNAL_APPLIED_FORCE
-            ),
-        )
+        n_target_particles = self._ApplyForceToTargetParticles()
+
+        if self.time % 1.0 < self.spheres_model_part.ProcessInfo[
+            KratosMultiphysics.DELTA_TIME
+        ]:
+            print(
+                "Time = {:.6g}; forced particles (R >= {}): {}"
+                .format(
+                    self.time,
+                    self.minimum_target_radius,
+                    n_target_particles
+                )
+            )
 
     def FinalizeSolutionStep(self):
         super(DEMAnalysisStageWithFlush, self).FinalizeSolutionStep()
+        
+        current_simulation_time = self.spheres_model_part.ProcessInfo[KratosMultiphysics.TIME]
+
+        if (
+            self.momentum_tracker is not None
+            and current_simulation_time + 1.0e-15
+            >= self.next_momentum_output_time
+        ):
+            self.momentum_tracker.Execute()
+
+            while (
+                self.next_momentum_output_time
+                <= current_simulation_time + 1.0e-15
+            ):
+                self.next_momentum_output_time += (
+                    self.momentum_output_interval)
 
         if self.parallel_type == "OpenMP":
             now = time.time()
@@ -135,12 +212,19 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
                 sys.stdout.flush()
                 self.last_flush = now
 
+def Finalize(self):
+    if self.momentum_tracker is not None:
+        self.momentum_tracker.Execute()
+
+    super(DEMAnalysisStageWithFlush, self).Finalize()
 
 if __name__ == "__main__":
     Logger.GetDefaultOutput().SetSeverity(Logger.Severity.INFO)
 
     with open("ProjectParametersDEM.json", "r") as parameter_file:
-        parameters = KratosMultiphysics.Parameters(parameter_file.read())
+        parameters = KratosMultiphysics.Parameters(
+            parameter_file.read()
+        )
 
     global_model = KratosMultiphysics.Model()
 

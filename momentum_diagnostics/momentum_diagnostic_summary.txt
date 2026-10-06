@@ -10,20 +10,20 @@ Forcing direction used for scalar projections:
 
 Coupling action-reaction check
 ------------------------------
-max ||F_DPD->DEM + F_DEM->DPD|| = nan
-RMS ||F_DPD->DEM + F_DEM->DPD|| = nan
+max ||F_DPD->DEM + F_DEM->DPD|| = 3.5531473332029459e-15
+RMS ||F_DPD->DEM + F_DEM->DPD|| = 1.4967993049313639e-16
 Force residual tolerance = 1.0000000000000000e-10
-Force residual status = CHECK
+Force residual status = PASS
 
 Global total-momentum check
 ---------------------------
-Fitted dP_total/dt in forcing direction = 4.9906263008406562e+00
-Mean expected force in forcing direction = nan
-Slope minus expected force = nan
+Fitted dP_total/dt in forcing direction = 1.9920194013033774e+00
+Mean expected force in forcing direction = 1.0081639453515494e+00
+Slope minus expected force = 9.8385545595182800e-01
 
 Per-step momentum-rate balance
 ------------------------------
-max ||dP_total/dt - F_expected|| = nan
-RMS ||dP_total/dt - F_expected|| = nan
+max ||dP_total/dt - F_expected|| = 7.9095018134393813e+00
+RMS ||dP_total/dt - F_expected|| = 1.3106225398863489e+00
 Momentum-rate tolerance = 1.0000000000000000e-08
 Momentum-rate status = CHECK

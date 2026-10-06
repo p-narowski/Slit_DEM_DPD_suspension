@@ -216,7 +216,7 @@ class MomentumTracker:
         row[prefix + "_z"] = vector[2]
 
     def _is_dem_particle(self, node):
-        return node.Is(DEM.DEMFlags.IS_SUSPENDED_PARTICLE)
+        return node.Is(DEM.IS_SUSPENDED_PARTICLE)
 
     @staticmethod
     def _get_nodal_mass(node):
@@ -531,7 +531,7 @@ class MomentumTracker:
             dem_dpd_force_on_dem=f_dpd_to_dem,
             dem_dpd_force_on_dpd=f_dem_to_dpd,
             external_force_on_system=None,
-            wall_force_on_system=None,
+            wall_force_on_system=[0.0, 0.0, 0.0],
         )
 
     def close(self):

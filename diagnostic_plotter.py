@@ -167,12 +167,29 @@ def main():
     valid_rate = np.isfinite(dpdt_parallel)
     valid_balance = np.isfinite(balance_error_norm)
 
-    mean_expected_force = np.nanmean(f_expected_parallel)
+    finite_expected = np.isfinite(f_expected_parallel)
 
-    reference_momentum = (
-        p_total_parallel[0]
-        + mean_expected_force * (time - time[0])
-    )
+    if np.any(finite_expected):
+        mean_expected_force = np.mean(
+            f_expected_parallel[finite_expected]
+        )
+    else:
+        mean_expected_force = float("nan")
+        print(
+            "Global force comparison unavailable: "
+            "F_expected contains no finite values."
+        )
+    if np.isfinite(mean_expected_force):
+        reference_momentum = (
+            p_total_parallel[0]
+            + mean_expected_force * (time - time[0])
+        )
+    else:
+        reference_momentum = np.full_like(
+            time,
+            np.nan,
+            dtype=float,
+        )
 
     # 1. Momentum: this figure intentionally plots momentum, not velocity.
     plt.figure(figsize=(10, 6))
