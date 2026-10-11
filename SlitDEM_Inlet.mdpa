@@ -6,7 +6,7 @@ Begin Properties 3
 End Properties
 
 Begin Nodes
-    51  0.456077  0.503055  0.23717
+    51  1  1  0.5
 End Nodes
 
 
@@ -18,13 +18,13 @@ Begin SubModelPart Inlet_SuspendedPart // Group Inlet // Subtree Inlet
         INJECTOR_ELEMENT_TYPE SuspendedParticle
         ELEMENT_TYPE SuspendedParticle
         CONTAINS_CLUSTERS 0
-        VELOCITY [3] (0.00000083, 0.0, 0.0)
+        VELOCITY [3] (0.02, 0.0, 0.0)
         MAX_RAND_DEVIATION_ANGLE 0.0
         INLET_NUMBER_OF_PARTICLES 1
         IMPOSED_MASS_FLOW_OPTION 0
         INLET_START_TIME 0.0
         INLET_STOP_TIME 1.5
-        RADIUS 0.10
+        RADIUS 0.20
         PROBABILITY_DISTRIBUTION normal
         STANDARD_DEVIATION 0.0
     End SubModelPartData

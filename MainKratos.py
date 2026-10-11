@@ -22,11 +22,11 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         # Select the inlet-generated suspended particle(s), while excluding
         # smaller DPD fluid particles.
-        self.minimum_target_radius = 0.099
+        self.minimum_target_radius = 0.2
 
         # The DEM inlet stops at t = 1.5 s. The driving force is applied at
         # the FIRST simulation time step after that time.
-        self.force_start_time = 1.5
+        self.force_start_time = 1.51
 
         # Prescribed external force on each selected suspended particle.
         # Example direction: +X.
@@ -38,13 +38,14 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         self.particles_model_part_name = "SpheresPart"
 
         # Runtime state / diagnostics.
-        self.target_particle_ids = set()
+        self.target_nodes = []
         self.force_has_been_activated = False
         self.force_activation_time = None
 
         # -------------------------------------------------------------
         # Momentum tracking settings
         # -------------------------------------------------------------
+        self.enable_momentum_tracker = False
         self.momentum_output_interval = 1.0e-2
         self.next_momentum_output_time = 0.0
         self.momentum_tracker = None
@@ -54,15 +55,14 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         particles_model_part = self._GetParticlesModelPart()
 
-        self.momentum_tracker = MomentumTracker(
-            particles_model_part,
-            output_directory=".",
-            suspended_radius_threshold=self.minimum_target_radius)
-
-        self.next_momentum_output_time = particles_model_part.ProcessInfo[
-            KratosMultiphysics.TIME]
-
-        self.momentum_tracker.Execute()
+        if self.enable_momentum_tracker:
+                self.momentum_tracker = MomentumTracker(
+                    particles_model_part,
+                    output_directory=".",
+                    suspended_radius_threshold=self.minimum_target_radius)
+                self.next_momentum_output_time = particles_model_part.ProcessInfo[
+                    KratosMultiphysics.TIME]
+                self.momentum_tracker.Execute()
 
         print("---- Suspended-particle force configuration ----")
         print(
@@ -108,13 +108,6 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         force[2] = self.driving_force_z
         return force
 
-    def _CreateZeroForce(self):
-        force = KratosMultiphysics.Array3()
-        force[0] = 0.0
-        force[1] = 0.0
-        force[2] = 0.0
-        return force
-
     def _SetExternalForceOnTargetParticles(self, force):
         target_particles = self._GetTargetParticles()
         current_ids = set()
@@ -128,89 +121,53 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         self.target_particle_ids = current_ids
         return target_particles
 
-    def _ApplyDrivingForceToTargetParticles(self):
-        driving_force = self._CreateDrivingForce()
-
-        target_particles = self._SetExternalForceOnTargetParticles(
-            driving_force)
-
-        return len(target_particles)
-
-    def _ClearForceFromTargetParticles(self):
-        zero_force = self._CreateZeroForce()
-
-        self._SetExternalForceOnTargetParticles(zero_force)
-
     def InitializeSolutionStep(self):
         super().InitializeSolutionStep()
 
-        particles_model_part = self._GetParticlesModelPart()
-        current_time = particles_model_part.ProcessInfo[
-            KratosMultiphysics.TIME]
-        delta_time = particles_model_part.ProcessInfo[
-            KratosMultiphysics.DELTA_TIME]
+        if self.force_has_been_activated:
+            return                      # nothing to do after the one-time assignment
 
-        # "First time step after 1.5 s" means:
-        #
-        #     t > 1.5 s
-        #
-        # The tolerance avoids an accidental activation at a numerically
-        # represented time equal to 1.5.
-        should_apply_force = (
-            current_time > self.force_start_time + 1.0e-15)
+        mp = self._GetParticlesModelPart()
+        current_time = mp.ProcessInfo[KratosMultiphysics.TIME]
 
-        if should_apply_force:
-            n_target_particles = self._ApplyDrivingForceToTargetParticles()
+        if current_time < self.force_start_time:
+            return
 
-            if not self.force_has_been_activated:
-                self.force_has_been_activated = True
-                self.force_activation_time = current_time
+        self.target_nodes = self._GetTargetParticles()   # single scan
+        if len(self.target_nodes) == 0:
+            raise RuntimeError(
+                "No suspended particle with RADIUS >= {} found at t = {}".format(
+                    self.minimum_target_radius, current_time))
 
-                print(
-                    "---- Driving force activated ----\n"
-                    "Requested start time: {}\n"
-                    "Actual first active time: {}\n"
-                    "Time step: {}\n"
-                    "Selected suspended particles: {}".format(
-                        self.force_start_time,
-                        self.force_activation_time,
-                        delta_time,
-                        n_target_particles))
-        else:
-            # Explicitly leave zero force before t = 1.5 s.
-            self._ClearForceFromTargetParticles()
+        force = self._CreateDrivingForce()
+        for node in self.target_nodes:
+            node.SetSolutionStepValue(
+                KratosMultiphysics.EXTERNAL_APPLIED_FORCE, force)
+
+        self.force_has_been_activated = True
+        self.force_activation_time = current_time
+        print("---- Driving force activated at t = {} on {} particle(s) ----".format(
+            current_time, len(self.target_nodes)))
 
     def FinalizeSolutionStep(self):
         super().FinalizeSolutionStep()
 
-        current_simulation_time = self.spheres_model_part.ProcessInfo[
-            KratosMultiphysics.TIME]
-
-        if (
-            self.momentum_tracker is not None
-            and current_simulation_time + 1.0e-15
-            >= self.next_momentum_output_time
-        ):
-            self.momentum_tracker.Execute()
-
-            while (
-                self.next_momentum_output_time
-                <= current_simulation_time + 1.0e-15
-            ):
-                self.next_momentum_output_time += (
-                    self.momentum_output_interval)
+        if self.enable_momentum_tracker and self.momentum_tracker is not None:
+            t = self.spheres_model_part.ProcessInfo[KratosMultiphysics.TIME]
+            if t + 1.0e-15 >= self.next_momentum_output_time:
+                self.momentum_tracker.Execute()
+                while self.next_momentum_output_time <= t + 1.0e-15:
+                    self.next_momentum_output_time += self.momentum_output_interval
 
         if self.parallel_type == "OpenMP":
             now = time.time()
-
             if now - self.last_flush > self.flush_frequency:
                 sys.stdout.flush()
                 self.last_flush = now
 
     def Finalize(self):
-        if self.momentum_tracker is not None:
+        if self.enable_momentum_tracker and self.momentum_tracker is not None:
             self.momentum_tracker.Execute()
-
         super().Finalize()
 
 
