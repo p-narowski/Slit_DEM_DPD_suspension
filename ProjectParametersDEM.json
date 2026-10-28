@@ -35,7 +35,7 @@
     "TranslationalIntegrationScheme": "Symplectic_Euler",
     "RotationalIntegrationScheme": "Direct_Integration",
     "MaxTimeStep": 5e-5,
-    "FinalTime": 60.0,
+    "FinalTime": 5.0,
     "NeighbourSearchFrequency": 5,
     "SearchTolerance": 0.02,
     "GraphExportFreq": 0.0,

@@ -1,29 +1,23 @@
-DEM-DPD momentum-conservation diagnostic summary
-===============================================
-
-Input CSV: momentum_history.csv
-Number of timesteps: 6002
-Time interval: [0.0000000000000000e+00, 6.0000000000868262e+01]
-
-Forcing direction used for scalar projections:
-  [1.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00]
-
-Coupling action-reaction check
-------------------------------
-max ||F_DPD->DEM + F_DEM->DPD|| = 3.5531473332029459e-15
-RMS ||F_DPD->DEM + F_DEM->DPD|| = 1.4967993049313639e-16
-Force residual tolerance = 1.0000000000000000e-10
-Force residual status = PASS
-
-Global total-momentum check
----------------------------
-Fitted dP_total/dt in forcing direction = 1.9920194013033774e+00
-Mean expected force in forcing direction = 1.0081639453515494e+00
-Slope minus expected force = 9.8385545595182800e-01
-
-Per-step momentum-rate balance
-------------------------------
-max ||dP_total/dt - F_expected|| = 7.9095018134393813e+00
-RMS ||dP_total/dt - F_expected|| = 1.3106225398863489e+00
-Momentum-rate tolerance = 1.0000000000000000e-08
-Momentum-rate status = CHECK
+DEM-DPD momentum diagnostics
+================================
+Rows: 52; window anchor: 0; end: 5.000049999995016
+Direction: [1.0, 0.0, 0.0]
+Strict valid intervals: 49
+Exploratory intervals (sampling flag NOT overridden): 49
+balance_valid: {1: 49, 0: 3}
+every_step_sampled: {1: 52}
+population_unchanged: {1: 50, 0: 2}
+force_budget_complete: {1: 52}
+WARNING: step is constant. A consecutive-STEP test cannot establish per-step sampling.
+Strict impulse norm: max=3.570909978e-03, RMS=6.161287494e-04, n=49
+Strict rate-error norm: max=3.570909978e-02, RMS=6.161287494e-03, n=49
+Exploratory impulse norm: max=3.570909978e-03, RMS=6.161287494e-04, n=49
+Exploratory rate-error norm: max=3.570909978e-02, RMS=6.161287494e-03, n=49
+Coupling norm (selected window): max=5.700301766e-15, RMS=9.744466607e-16, n=51
+GLOBAL STATUS: CHECK on strict valid intervals only
+Exploratory duration: 4.8000499999945943e+00
+Exploratory measured projected mean rate: 3.5306969431705637e-01
+Exploratory expected projected mean rate: 3.5416818574782327e-01
+Exploratory cumulative projected mismatch: -5.2728137922466445e-03
+Exploratory cumulative vector mismatch: 6.1562047519913227e-03
+Population/mass-change interval END times: [1.1000000000001091, 1.6000000000011645]

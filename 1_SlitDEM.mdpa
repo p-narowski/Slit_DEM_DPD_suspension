@@ -1,0 +1,27 @@
+Begin ModelPartData
+//  VARIABLE_NAME value
+End ModelPartData
+
+Begin Properties 0
+End Properties
+
+Begin Nodes
+       1  0.459018  0.876094  0.310171
+End Nodes
+
+Begin Elements DPDParticle
+       1  0  1
+End Elements
+
+Begin NodalData RADIUS // GUI group identifier: ParticlesPart
+       1   0  0.02
+End NodalData
+
+Begin SubModelPart DEMParts_ParticlesPart // GUI group identifier: ParticlesPart
+    Begin SubModelPartNodes
+        1
+    End SubModelPartNodes
+    Begin SubModelPartElements
+        1
+    End SubModelPartElements
+End SubModelPart

@@ -22,7 +22,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         # Select the inlet-generated suspended particle(s), while excluding
         # smaller DPD fluid particles.
-        self.minimum_target_radius = 0.2
+        self.minimum_target_radius = 0.19
 
         # The DEM inlet stops at t = 1.5 s. The driving force is applied at
         # the FIRST simulation time step after that time.
@@ -45,8 +45,8 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         # -------------------------------------------------------------
         # Momentum tracking settings
         # -------------------------------------------------------------
-        self.enable_momentum_tracker = False
-        self.momentum_output_interval = 1.0e-2
+        self.enable_momentum_tracker = True
+        self.momentum_output_interval = 1.0e-1
         self.next_momentum_output_time = 0.0
         self.momentum_tracker = None
 
@@ -57,9 +57,16 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         if self.enable_momentum_tracker:
                 self.momentum_tracker = MomentumTracker(
-                    particles_model_part,
-                    output_directory=".",
-                    suspended_radius_threshold=self.minimum_target_radius)
+                particles_model_part,
+                output_directory=".",
+                suspended_radius_threshold=self.minimum_target_radius,
+                output_file_name="momentum_history.csv",
+                output_interval=0.1,
+                classification="flag",
+                wall_mode="none",
+                gravity=(0.0, 0.0, 0.0),
+                forces_complete=True,
+            )
                 self.next_momentum_output_time = particles_model_part.ProcessInfo[
                     KratosMultiphysics.TIME]
                 self.momentum_tracker.Execute()
@@ -153,14 +160,11 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         super().FinalizeSolutionStep()
 
         if self.enable_momentum_tracker and self.momentum_tracker is not None:
-            t = self.spheres_model_part.ProcessInfo[KratosMultiphysics.TIME]
-            if t + 1.0e-15 >= self.next_momentum_output_time:
-                self.momentum_tracker.Execute()
-                while self.next_momentum_output_time <= t + 1.0e-15:
-                    self.next_momentum_output_time += self.momentum_output_interval
+            self.momentum_tracker.Execute()
 
         if self.parallel_type == "OpenMP":
             now = time.time()
+
             if now - self.last_flush > self.flush_frequency:
                 sys.stdout.flush()
                 self.last_flush = now
@@ -168,6 +172,8 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
     def Finalize(self):
         if self.enable_momentum_tracker and self.momentum_tracker is not None:
             self.momentum_tracker.Execute()
+            self.momentum_tracker.close()
+
         super().Finalize()
 
 

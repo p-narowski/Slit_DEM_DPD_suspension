@@ -1,548 +1,287 @@
+"""Serial/OpenMP DEM-DPD momentum and impulse diagnostics.
+
+Call Execute() after EVERY completed solver step, including one initial call
+before the first step. CSV writing is throttled internally. Forces sampled at
+step completion must be the forces actually used for that velocity update.
+No MPI/global reduction is implemented. No solver state is modified.
+"""
 import csv
 import math
 import os
-
 import KratosMultiphysics as KM
 import KratosMultiphysics.DEMApplication as DEM
 
 
+def vec(value):
+    result = [float(value[i]) for i in range(3)]
+    if not all(math.isfinite(x) for x in result):
+        raise ValueError("Non-finite vector in momentum diagnostic")
+    return result
+
+
+def add(a, b):
+    return [a[i] + b[i] for i in range(3)]
+
+
+def sub(a, b):
+    return [a[i] - b[i] for i in range(3)]
+
+
+def scale(a, factor):
+    return [factor * x for x in a]
+
+
+def norm(a):
+    return math.hypot(*a)
+
+
 class MomentumTracker:
-    """
-    Momentum tracker for a single parent particle model part.
+    """Track P and integral(F dt), with explicit completeness flags.
 
-    Particle classification
-    -----------------------
-    DEM/suspended particles:
-        RADIUS >= suspended_radius_threshold
+    wall_mode:
+      'none': caller asserts that no wall force exists.
+      'callback': wall_force_provider(model_part) returns the net wall force
+                  ON PARTICLES, evaluated at the force stage used by solver.
+      'unknown': wall force and physical balance residuals are NaN.
 
-    DPD/fluid particles:
-        RADIUS < suspended_radius_threshold
+    Optional force providers return three-component SYSTEM TOTALS:
+      external_force_provider replaces the default sum of
+      EXTERNAL_APPLIED_FORCE over ALL particles plus sum(m)*gravity.
+      other_force_provider supplies other external forces, e.g. constraints.
+      wall_force_provider supplies ONLY wall force, not TOTAL_FORCES.
 
-    Current capability
-    ------------------
-    This tracker computes and writes:
-        P_dem
-        P_dpd
-        P_total = P_dem + P_dpd
-        dP_total/dt
+    Default gravity is explicitly zero. Set it for gravitational cases.
+    forces_complete=True is the caller's assertion that these categories
+    cover ALL external forces and use the correct integration-stage values.
+    Keep it False until this has been verified.
 
-    It intentionally writes NaN for DEM-DPD coupling-force fields until
-    actual coupling-only force accumulators are supplied from the force-
-    assembly implementation.
-
-    Important:
-    TOTAL_FORCES must not be used as a substitute for DEM-DPD coupling
-    forces unless it is known to contain only that interaction. In this
-    simulation, TOTAL_FORCES may also contain prescribed external force,
-    wall force, gravity, DEM contact, or other terms.
+    A changed ID set or mass invalidates the physical residual for that CSV
+    interval. This deliberately does not estimate inlet/deletion impulses.
+    Start a clean interval with ResetBaseline() after inlet activity ends.
+    Stable IDs do not detect imposed velocities: those require accounting
+    for their impulses or forces_complete=False.
     """
 
-    _HEADER = [
-        "step",
-        "time",
-        "dt",
+    VECTOR_FIELDS = (
+        'P_dem', 'P_dpd', 'P_total', 'F_external', 'F_wall', 'F_other',
+        'F_expected', 'F_dpd_to_dem', 'F_dem_to_dpd',
+        'F_coupling_residual', 'dP_total_dt', 'J_external', 'J_wall',
+        'J_other', 'J_expected', 'delta_P', 'impulse_balance_error',
+        'momentum_balance_error',
+    )
 
-        "P_dem_x",
-        "P_dem_y",
-        "P_dem_z",
-
-        "P_dpd_x",
-        "P_dpd_y",
-        "P_dpd_z",
-
-        "P_total_x",
-        "P_total_y",
-        "P_total_z",
-
-        "F_external_x",
-        "F_external_y",
-        "F_external_z",
-
-        "F_wall_x",
-        "F_wall_y",
-        "F_wall_z",
-
-        "F_dpd_to_dem_x",
-        "F_dpd_to_dem_y",
-        "F_dpd_to_dem_z",
-
-        "F_dem_to_dpd_x",
-        "F_dem_to_dpd_y",
-        "F_dem_to_dpd_z",
-
-        "F_coupling_residual_x",
-        "F_coupling_residual_y",
-        "F_coupling_residual_z",
-        "F_coupling_residual_norm",
-
-        "dP_total_dt_x",
-        "dP_total_dt_y",
-        "dP_total_dt_z",
-
-        "F_expected_x",
-        "F_expected_y",
-        "F_expected_z",
-
-        "momentum_balance_error_x",
-        "momentum_balance_error_y",
-        "momentum_balance_error_z",
-        "momentum_balance_error_norm",
-    ]
-
-    def __init__(
-        self,
-        particles_model_part,
-        output_directory=".",
-        suspended_radius_threshold=0.0,
-        output_file_name="momentum_history.csv",
-        append=False,
-    ):
-        """
-        Parameters
-        ----------
-        particles_model_part
-            Parent model part containing both DPD particles and suspended
-            DEM particles. In the present case this is SpheresPart.
-
-        output_directory : str
-            Directory where the CSV file will be written.
-
-        suspended_radius_threshold : float
-            Nodes with RADIUS >= this value are treated as DEM/suspended
-            particles. Nodes below this value are treated as DPD particles.
-
-        output_file_name : str
-            Name of output CSV file.
-
-        append : bool
-            If True, append to an existing CSV. Default False overwrites
-            the old history and writes a fresh header.
-        """
-        self._file = None
-        self._writer = None
-
-        self.particles_model_part = particles_model_part
-        self.suspended_radius_threshold = float(
-            suspended_radius_threshold
-        )
-
-        self._previous_time = None
-        self._previous_total_momentum = None
-
-        if output_directory is None:
-            output_directory = "."
-
-        os.makedirs(output_directory, exist_ok=True)
-
-        self.output_file_name = os.path.join(
-            output_directory,
-            output_file_name,
-        )
-
-        mode = "a" if append else "w"
-
-        file_is_empty = (
-            not os.path.exists(self.output_file_name)
-            or os.path.getsize(self.output_file_name) == 0
-        )
-
-        self._file = open(
-            self.output_file_name,
-            mode,
-            newline="",
-        )
-
-        self._writer = csv.DictWriter(
-            self._file,
-            fieldnames=self._HEADER,
-        )
-
-        if not append or file_is_empty:
-            self._writer.writeheader()
-            self._file.flush()
+    def __init__(self, particles_model_part, output_directory='.',
+                 suspended_radius_threshold=0.19,
+                 output_file_name='momentum_history.csv', append=False,
+                 output_interval=0.1, classification='flag',
+                 wall_mode='unknown', wall_force_provider=None,
+                 external_force_provider=None, other_force_provider=None,
+                 gravity=(0.0, 0.0, 0.0), forces_complete=False):
+        if append:
+            raise ValueError('Appending without restoring impulse state is unsupported')
+        if classification not in ('flag', 'radius'):
+            raise ValueError("classification must be 'flag' or 'radius'")
+        if wall_mode not in ('none', 'unknown', 'callback'):
+            raise ValueError('Invalid wall_mode')
+        if wall_mode == 'callback' and wall_force_provider is None:
+            raise ValueError('wall_force_provider is required')
+        if wall_mode != 'callback' and wall_force_provider is not None:
+            raise ValueError("Use wall_mode='callback' with a wall provider")
+        if float(output_interval) < 0:
+            raise ValueError('output_interval must be nonnegative')
+        self.mp = particles_model_part
+        self.threshold = float(suspended_radius_threshold)
+        self.classification = classification
+        self.wall_mode = wall_mode
+        self.wall_provider = wall_force_provider
+        self.external_provider = external_force_provider
+        self.other_provider = other_force_provider
+        self.gravity = vec(gravity)
+        self.forces_complete = bool(forces_complete)
+        self.output_interval = float(output_interval)
+        communicator = self.mp.GetCommunicator().GetDataCommunicator()
+        if communicator.Size() != 1:
+            raise RuntimeError('This tracker supports serial/OpenMP only, not MPI')
+        os.makedirs(output_directory or '.', exist_ok=True)
+        self.output_file_name = os.path.join(output_directory or '.', output_file_name)
+        fields = ['step', 'time', 'dt', 'solver_dt', 'n_particles',
+                  'population_unchanged', 'every_step_sampled',
+                  'force_budget_complete', 'balance_valid', 'coupling_available',
+                  'F_coupling_residual_norm', 'impulse_balance_error_norm',
+                  'momentum_balance_error_norm']
+        fields += [prefix + '_' + axis for prefix in self.VECTOR_FIELDS for axis in 'xyz']
+        self._file = open(self.output_file_name, 'w', newline='')
+        self._writer = csv.DictWriter(self._file, fieldnames=fields)
+        self._writer.writeheader()
+        self._last_time = None
+        self._last_step = None
+        self._population = None
+        self._last_write_time = None
+        self._last_write_p = None
+        self._latest = None
+        self._clear_interval()
 
     @staticmethod
-    def _zero():
-        return [0.0, 0.0, 0.0]
+    def _read(node, variable, default=None):
+        if node.SolutionStepsDataHas(variable):
+            return node.GetSolutionStepValue(variable)
+        if node.Has(variable):
+            return node.GetValue(variable)
+        if default is not None:
+            return default
+        raise RuntimeError('Missing {} on node {}'.format(variable.Name(), node.Id))
 
-    @staticmethod
-    def _nan_vector():
-        return [float("nan"), float("nan"), float("nan")]
-
-    @staticmethod
-    def _as_list(vector):
-        return [
-            float(vector[0]),
-            float(vector[1]),
-            float(vector[2]),
-        ]
-
-    @staticmethod
-    def _add(a, b):
-        return [
-            a[0] + b[0],
-            a[1] + b[1],
-            a[2] + b[2],
-        ]
-
-    @staticmethod
-    def _subtract(a, b):
-        return [
-            a[0] - b[0],
-            a[1] - b[1],
-            a[2] - b[2],
-        ]
-
-    @staticmethod
-    def _scale(vector, scalar):
-        return [
-            scalar * vector[0],
-            scalar * vector[1],
-            scalar * vector[2],
-        ]
-
-    @staticmethod
-    def _norm(vector):
-        return math.sqrt(
-            vector[0] * vector[0]
-            + vector[1] * vector[1]
-            + vector[2] * vector[2]
-        )
-
-    @staticmethod
-    def _write_vector(row, prefix, vector):
-        row[prefix + "_x"] = vector[0]
-        row[prefix + "_y"] = vector[1]
-        row[prefix + "_z"] = vector[2]
-
-    def _is_dem_particle(self, node):
+    def _is_dem(self, node):
+        if self.classification == 'radius':
+            return float(self._read(node, KM.RADIUS)) >= self.threshold
         return node.Is(DEM.IS_SUSPENDED_PARTICLE)
 
-    @staticmethod
-    def _get_nodal_mass(node):
-        """
-        Obtain the mass used by the particle time integration.
-
-        NODAL_MASS is expected for this DEM/DPD setup. The alternatives are
-        retained to make failure messages clearer if a variable is stored
-        non-historically instead.
-        """
-        if node.SolutionStepsDataHas(KM.NODAL_MASS):
-            return float(
-                node.GetSolutionStepValue(KM.NODAL_MASS)
-            )
-
-        if node.SolutionStepsDataHas(KM.MASS):
-            return float(
-                node.GetSolutionStepValue(KM.MASS)
-            )
-
-        if node.Has(KM.NODAL_MASS):
-            return float(node.GetValue(KM.NODAL_MASS))
-
-        if node.Has(KM.MASS):
-            return float(node.GetValue(KM.MASS))
-
-        raise RuntimeError(
-            "Could not find NODAL_MASS or MASS on node {}. "
-            "Update _get_nodal_mass() to use the mass variable used by "
-            "your particle formulation.".format(node.Id)
-        )
-
-    @staticmethod
-    def _get_nodal_velocity(node):
-        if node.SolutionStepsDataHas(KM.VELOCITY):
-            return MomentumTracker._as_list(
-                node.GetSolutionStepValue(KM.VELOCITY)
-            )
-
-        if node.Has(KM.VELOCITY):
-            return MomentumTracker._as_list(
-                node.GetValue(KM.VELOCITY)
-            )
-
-        raise RuntimeError(
-            "Could not find VELOCITY on node {}.".format(node.Id)
-        )
-
-    def _split_momentum(self):
-        """
-        Return P_dem and P_dpd by summing m*v over the relevant nodes.
-        """
-        p_dem = self._zero()
-        p_dpd = self._zero()
-
-        for node in self.particles_model_part.Nodes:
-            mass = self._get_nodal_mass(node)
-            velocity = self._get_nodal_velocity(node)
-            particle_momentum = self._scale(velocity, mass)
-
-            if self._is_dem_particle(node):
-                p_dem = self._add(p_dem, particle_momentum)
+    def _snapshot(self):
+        pd, pf = [0.0]*3, [0.0]*3
+        ext_terms = [[], [], []]
+        dem_terms = [[], [], []]
+        dpd_terms = [[], [], []]
+        coupling = [[], []]
+        coupling_available = True
+        population = {}
+        cv_dem = getattr(DEM, 'DPD_TO_DEM_COUPLING_FORCE', None)
+        cv_dpd = getattr(DEM, 'DEM_TO_DPD_COUPLING_FORCE', None)
+        for node in self.mp.Nodes:
+            mass = float(self._read(node, KM.NODAL_MASS))
+            if not math.isfinite(mass) or mass < 0:
+                raise ValueError('Invalid NODAL_MASS on node {}'.format(node.Id))
+            population[node.Id] = mass
+            velocity = vec(self._read(node, KM.VELOCITY))
+            is_dem = self._is_dem(node)
+            terms = dem_terms if is_dem else dpd_terms
+            applied = vec(self._read(node, KM.EXTERNAL_APPLIED_FORCE, [0.0]*3))
+            for i in range(3):
+                terms[i].append(mass * velocity[i])
+                ext_terms[i].append(applied[i] + mass * self.gravity[i])
+            variable = cv_dem if is_dem else cv_dpd
+            if variable is None:
+                coupling_available = False
+            elif node.SolutionStepsDataHas(variable) or node.Has(variable):
+                coupling[0 if is_dem else 1].append(vec(self._read(node, variable)))
             else:
-                p_dpd = self._add(p_dpd, particle_momentum)
+                coupling_available = False
+        pd = [math.fsum(t) for t in dem_terms]
+        pf = [math.fsum(t) for t in dpd_terms]
+        ext = (vec(self.external_provider(self.mp)) if self.external_provider
+               else [math.fsum(t) for t in ext_terms])
+        wall = ([0.0]*3 if self.wall_mode == 'none' else
+                vec(self.wall_provider(self.mp)) if self.wall_mode == 'callback'
+                else [float('nan')]*3)
+        other = vec(self.other_provider(self.mp)) if self.other_provider else [0.0]*3
+        if coupling_available:
+            cd, cf = [[math.fsum(v[i] for v in group) for i in range(3)]
+                      for group in coupling]
+        else:
+            cd, cf = [float('nan')]*3, [float('nan')]*3
+        return dict(P_dem=pd, P_dpd=pf, P_total=add(pd, pf),
+                    F_external=ext, F_wall=wall, F_other=other,
+                    F_expected=add(add(ext, wall), other),
+                    F_dpd_to_dem=cd, F_dem_to_dpd=cf,
+                    F_coupling_residual=add(cd, cf),
+                    coupling_available=coupling_available,
+                    population=population)
 
-        return p_dem, p_dpd
+    def _clear_interval(self):
+        self._impulses = {name: [0.0]*3 for name in ('external', 'wall', 'other')}
+        self._population_ok = True
+        self._sampling_ok = True
 
-    def _get_time(self):
-        process_info = self.particles_model_part.ProcessInfo
-
-        if not process_info.Has(KM.TIME):
-            raise RuntimeError(
-                "TIME was not found in particles_model_part.ProcessInfo."
+    def Execute(self):
+        """Sample every completed step; return False for duplicate-time calls."""
+        time = float(self.mp.ProcessInfo[KM.TIME])
+        step = int(self.mp.ProcessInfo[KM.STEP])
+        if self._last_time is not None:
+            if time == self._last_time:
+                return False
+            if time < self._last_time:
+                raise RuntimeError('Simulation time moved backwards')
+        snapshot = self._snapshot()
+        solver_dt = float(self.mp.ProcessInfo[KM.DELTA_TIME])
+        if self._last_time is None:
+            self._last_write_time = time
+            self._last_write_p = snapshot['P_total'][:]
+        else:
+            dt = time - self._last_time
+            dt_matches = math.isclose(
+                dt,
+                solver_dt,
+                rel_tol=1e-7,
+                abs_tol=1e-12,
             )
 
-        return float(process_info[KM.TIME])
+            self._sampling_ok = self._sampling_ok and dt_matches
+            self._population_ok = (self._population_ok and
+                                   snapshot['population'] == self._population)
+            for name in self._impulses:
+                self._impulses[name] = add(self._impulses[name],
+                                          scale(snapshot['F_' + name], dt))
+        self._last_time, self._last_step = time, step
+        self._population = snapshot['population']
+        self._latest = (time, step, solver_dt, snapshot)
+        if time == self._last_write_time and self._last_write_p == snapshot['P_total']:
+            # Only the initial sample has an empty interval here.
+            if not getattr(self, '_initial_written', False):
+                self._write()
+                self._initial_written = True
+        elif time - self._last_write_time >= self.output_interval - 1e-12:
+            self._write()
+        return True
 
-    def _get_step(self):
-        process_info = self.particles_model_part.ProcessInfo
-
-        if process_info.Has(KM.STEP):
-            return int(process_info[KM.STEP])
-
-        return -1
-
-    def _sum_external_applied_force_on_dem(self):
-        """
-        Sum the prescribed external force stored on selected DEM nodes.
-
-        This is meaningful for your current MainKratos.py because it sets
-        EXTERNAL_APPLIED_FORCE on every radius-selected target particle.
-
-        It does not include gravity unless gravity has separately been added
-        into EXTERNAL_APPLIED_FORCE by your simulation setup.
-        """
-        total_external_force = self._zero()
-
-        for node in self.particles_model_part.Nodes:
-            if not self._is_dem_particle(node):
-                continue
-
-            if node.SolutionStepsDataHas(KM.EXTERNAL_APPLIED_FORCE):
-                force = node.GetSolutionStepValue(
-                    KM.EXTERNAL_APPLIED_FORCE
-                )
-                total_external_force = self._add(
-                    total_external_force,
-                    self._as_list(force),
-                )
-
-            elif node.Has(KM.EXTERNAL_APPLIED_FORCE):
-                force = node.GetValue(KM.EXTERNAL_APPLIED_FORCE)
-                total_external_force = self._add(
-                    total_external_force,
-                    self._as_list(force),
-                )
-
-        return total_external_force
-
-    def record(
-        self,
-        dem_dpd_force_on_dem=None,
-        dem_dpd_force_on_dpd=None,
-        external_force_on_system=None,
-        wall_force_on_system=None,
-    ):
-        """
-        Write one row of momentum diagnostics.
-
-        Parameters
-        ----------
-        dem_dpd_force_on_dem : length-3 sequence or None
-            Sum of coupling-only forces exerted by DPD particles on DEM
-            particles. Until a real coupling accumulator is connected,
-            leave as None. The CSV then writes NaN.
-
-        dem_dpd_force_on_dpd : length-3 sequence or None
-            Sum of reaction coupling-only forces exerted by DEM particles on
-            DPD particles. Until a real accumulator is connected, leave as
-            None. The CSV then writes NaN.
-
-        external_force_on_system : length-3 sequence or None
-            Net known external force on the full DEM+DPD system. If None,
-            this tracker sums EXTERNAL_APPLIED_FORCE on DEM-selected nodes.
-
-        wall_force_on_system : length-3 sequence or None
-            Net force applied by walls to DEM+DPD. Leave as None until it is
-            explicitly measured; the corresponding global-balance fields
-            will then be written as NaN.
-        """
-        time = self._get_time()
-        step = self._get_step()
-
-        p_dem, p_dpd = self._split_momentum()
-        p_total = self._add(p_dem, p_dpd)
-
-        if external_force_on_system is None:
-            f_external = self._sum_external_applied_force_on_dem()
-        else:
-            f_external = self._as_list(external_force_on_system)
-
-        wall_force_is_available = wall_force_on_system is not None
-
-        if wall_force_is_available:
-            f_wall = self._as_list(wall_force_on_system)
-            f_expected = self._add(f_external, f_wall)
-        else:
-            f_wall = self._nan_vector()
-            f_expected = self._nan_vector()
-
-        coupling_forces_are_available = (
-            dem_dpd_force_on_dem is not None
-            and dem_dpd_force_on_dpd is not None
-        )
-
-        if coupling_forces_are_available:
-            f_dpd_to_dem = self._as_list(dem_dpd_force_on_dem)
-            f_dem_to_dpd = self._as_list(dem_dpd_force_on_dpd)
-
-            f_coupling_residual = self._add(
-                f_dpd_to_dem,
-                f_dem_to_dpd,
-            )
-
-            f_coupling_residual_norm = self._norm(
-                f_coupling_residual
-            )
-        else:
-            f_dpd_to_dem = self._nan_vector()
-            f_dem_to_dpd = self._nan_vector()
-            f_coupling_residual = self._nan_vector()
-            f_coupling_residual_norm = float("nan")
-
-        if self._previous_time is None:
-            dt = 0.0
-            dp_total_dt = self._nan_vector()
-            momentum_balance_error = self._nan_vector()
-            momentum_balance_error_norm = float("nan")
-        else:
-            dt = time - self._previous_time
-
-            if dt <= 0.0:
-                raise RuntimeError(
-                    "Non-positive diagnostic timestep: current time = {}, "
-                    "previous time = {}.".format(
-                        time,
-                        self._previous_time,
-                    )
-                )
-
-            dp_total_dt = self._scale(
-                self._subtract(
-                    p_total,
-                    self._previous_total_momentum,
-                ),
-                1.0 / dt,
-            )
-
-            if wall_force_is_available:
-                momentum_balance_error = self._subtract(
-                    dp_total_dt,
-                    f_expected,
-                )
-
-                momentum_balance_error_norm = self._norm(
-                    momentum_balance_error
-                )
-            else:
-                momentum_balance_error = self._nan_vector()
-                momentum_balance_error_norm = float("nan")
-
-        row = {
-            "step": step,
-            "time": time,
-            "dt": dt,
-            "F_coupling_residual_norm": f_coupling_residual_norm,
-            "momentum_balance_error_norm": (
-                momentum_balance_error_norm
-            ),
-        }
-
-        self._write_vector(row, "P_dem", p_dem)
-        self._write_vector(row, "P_dpd", p_dpd)
-        self._write_vector(row, "P_total", p_total)
-
-        self._write_vector(row, "F_external", f_external)
-        self._write_vector(row, "F_wall", f_wall)
-
-        self._write_vector(row, "F_dpd_to_dem", f_dpd_to_dem)
-        self._write_vector(row, "F_dem_to_dpd", f_dem_to_dpd)
-
-        self._write_vector(
-            row,
-            "F_coupling_residual",
-            f_coupling_residual,
-        )
-
-        self._write_vector(row, "dP_total_dt", dp_total_dt)
-        self._write_vector(row, "F_expected", f_expected)
-
-        self._write_vector(
-            row,
-            "momentum_balance_error",
-            momentum_balance_error,
-        )
-
+    def _write(self):
+        time, step, solver_dt, snapshot = self._latest
+        dt = time - self._last_write_time
+        nan = [float('nan')]*3
+        delta = sub(snapshot['P_total'], self._last_write_p)
+        j = add(add(self._impulses['external'], self._impulses['wall']),
+                self._impulses['other'])
+        complete = self.forces_complete and self.wall_mode != 'unknown'
+        valid = dt > 0 and complete and self._sampling_ok and self._population_ok
+        error = sub(delta, j) if valid else nan[:]
+        values = {k: snapshot[k] for k in self.VECTOR_FIELDS if k in snapshot}
+        values.update(delta_P=delta, dP_total_dt=scale(delta, 1/dt) if dt > 0 else nan[:],
+                      J_external=self._impulses['external'],
+                      J_wall=self._impulses['wall'], J_other=self._impulses['other'],
+                      J_expected=j, impulse_balance_error=error,
+                      momentum_balance_error=scale(error, 1/dt) if valid else nan[:])
+        row = dict(step=step, time=time, dt=dt, solver_dt=solver_dt,
+                   n_particles=len(snapshot['population']),
+                   population_unchanged=int(self._population_ok),
+                   every_step_sampled=int(self._sampling_ok),
+                   force_budget_complete=int(complete), balance_valid=int(valid),
+                   coupling_available=int(snapshot['coupling_available']),
+                   F_coupling_residual_norm=norm(snapshot['F_coupling_residual']),
+                   impulse_balance_error_norm=norm(error),
+                   momentum_balance_error_norm=norm(values['momentum_balance_error']))
+        for prefix, value in values.items():
+            for i, axis in enumerate('xyz'):
+                row[prefix + '_' + axis] = value[i]
         self._writer.writerow(row)
         self._file.flush()
+        self._last_write_time = time
+        self._last_write_p = snapshot['P_total'][:]
+        self._clear_interval()
 
-        self._previous_time = time
-        self._previous_total_momentum = p_total[:]
-    def _sum_coupling_variable(
-        self,
-        variable,
-        select_dem_particles,
-):
-        total = self._zero()
-
-        for node in self.particles_model_part.Nodes:
-            if self._is_dem_particle(node) != select_dem_particles:
-                continue
-
-            value = node.GetSolutionStepValue(variable)
-
-            total = self._add(
-                total,
-                self._as_list(value),
-            )
-
-        return total
-
-
-    def _get_coupling_force_totals(self):
-        f_dpd_to_dem = self._sum_coupling_variable(
-            DEM.DPD_TO_DEM_COUPLING_FORCE,
-            select_dem_particles=True,
-        )
-
-        f_dem_to_dpd = self._sum_coupling_variable(
-            DEM.DEM_TO_DPD_COUPLING_FORCE,
-            select_dem_particles=False,
-        )
-
-        return f_dpd_to_dem, f_dem_to_dpd
-    
-    def Execute(self):
-        f_dpd_to_dem, f_dem_to_dpd = (
-            self._get_coupling_force_totals()
-        )
-
-        self.record(
-            dem_dpd_force_on_dem=f_dpd_to_dem,
-            dem_dpd_force_on_dpd=f_dem_to_dpd,
-            external_force_on_system=None,
-            wall_force_on_system=[0.0, 0.0, 0.0],
-        )
+    def ResetBaseline(self):
+        """Discard the pending interval, e.g. immediately after inlet shutdown."""
+        if self._latest is None:
+            raise RuntimeError('Call Execute() before resetting the baseline')
+        self._last_write_time = self._latest[0]
+        self._last_write_p = self._latest[3]['P_total'][:]
+        self._clear_interval()
 
     def close(self):
-        """
-        Close the CSV safely, including if __init__ failed partway through.
-        """
-        file_handle = getattr(self, "_file", None)
-
-        if file_handle is not None:
-            file_handle.close()
-            self._file = None
+        handle = getattr(self, '_file', None)
+        if handle is not None and not handle.closed:
+            if self._latest is not None and self._latest[0] > self._last_write_time:
+                self._write()
+            handle.close()
 
     def __del__(self):
-        self.close()
+        handle = getattr(self, '_file', None)
+        if handle is not None and not handle.closed:
+            handle.close()
