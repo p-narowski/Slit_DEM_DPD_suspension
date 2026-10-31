@@ -45,7 +45,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
         # -------------------------------------------------------------
         # Momentum tracking settings
         # -------------------------------------------------------------
-        self.enable_momentum_tracker = True
+        self.enable_momentum_tracker = False
         self.momentum_output_interval = 1.0e-1
         self.next_momentum_output_time = 0.0
         self.momentum_tracker = None

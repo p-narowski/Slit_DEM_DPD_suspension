@@ -1,0 +1,23 @@
+DEM-DPD momentum diagnostics
+================================
+Rows: 52; window anchor: 1.600000000001164; end: 5.000049999995016
+Direction: [1.0, 0.0, 0.0]
+Strict valid intervals: 35
+Exploratory intervals (sampling flag NOT overridden): 35
+balance_valid: {1: 49, 0: 3}
+every_step_sampled: {1: 52}
+population_unchanged: {1: 50, 0: 2}
+force_budget_complete: {1: 52}
+WARNING: step is constant. A consecutive-STEP test cannot establish per-step sampling.
+Strict impulse norm: max=1.186412080e-13, RMS=1.135201242e-13, n=35
+Strict rate-error norm: max=8.881851960e-12, RMS=1.882180647e-12, n=35
+Exploratory impulse norm: max=1.186412080e-13, RMS=1.135201242e-13, n=35
+Exploratory rate-error norm: max=8.881851960e-12, RMS=1.882180647e-12, n=35
+Coupling norm (selected window): max=0.000000000e+00, RMS=0.000000000e+00, n=35
+GLOBAL STATUS: PASS on strict valid intervals only
+Exploratory duration: 3.4000499999938518e+00
+Exploratory measured projected mean rate: 5.0000000000090183e-01
+Exploratory expected projected mean rate: 4.9999999999999961e-01
+Exploratory cumulative projected mismatch: 3.0675462170393075e-12
+Exploratory cumulative vector mismatch: 3.0675462170393075e-12
+Population/mass-change interval END times: [1.1000000000001091, 1.6000000000011645]
