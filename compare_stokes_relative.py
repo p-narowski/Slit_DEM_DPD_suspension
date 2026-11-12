@@ -10,7 +10,7 @@ solid_csv = "solid_particle_vx_and_trajectory.csv"
 fluid_csv = "dpd_bulk_velocity.csv"
 output_csv = "stokes_relative_velocity_comparison.csv"
 
-R = 0.2
+R = 0.4
 rho_p = 1007.0
 mu = 6.53
 F0 = 0.5

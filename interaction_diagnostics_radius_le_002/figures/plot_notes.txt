@@ -1,0 +1,7 @@
+Plots use the selected saved frames without smoothing.
+CSV values and physical units are unchanged.
+Radial density is an equal-frame mean; shading is across-frame SD.
+Radial slip curves pool particle samples, weighting squared RMS by count.
+These are finite-gap slip proxies, not extrapolated surface slip lengths.
+Nearest-neighbor curves require --nearest-neighbors during CSV generation.
+Heatmap cells represent snapshot samples, not resolved between-frame dynamics.

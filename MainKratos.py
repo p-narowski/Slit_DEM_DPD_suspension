@@ -22,11 +22,11 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         # Select the inlet-generated suspended particle(s), while excluding
         # smaller DPD fluid particles.
-        self.minimum_target_radius = 0.19
+        self.minimum_target_radius = 0.39
 
         # The DEM inlet stops at t = 1.5 s. The driving force is applied at
         # the FIRST simulation time step after that time.
-        self.force_start_time = 1.51
+        self.force_start_time = 0.5
 
         # Prescribed external force on each selected suspended particle.
         # Example direction: +X.

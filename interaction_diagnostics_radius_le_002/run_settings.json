@@ -1,0 +1,44 @@
+{
+  "vtkdir": "Slit_Post_VTK_Files",
+  "pattern": "Slit_Particles_*.vtu",
+  "output_interval": 0.5,
+  "index_origin": 0,
+  "time_offset": 0.0,
+  "dem_radius": 0.2,
+  "dpd_radius": 0.02,
+  "dem_cutoff": 0.2,
+  "dpd_cutoff": 0.08,
+  "box": [
+    2.0,
+    2.0,
+    1.0
+  ],
+  "periodic": "xyz",
+  "fluid_volume": null,
+  "volume_convention": "exclude-solid",
+  "near_width": 0.05,
+  "equator_degrees": 15.0,
+  "axis": "x",
+  "radial_bins": 20,
+  "radius_tolerance": 1e-06,
+  "velocity_array": null,
+  "radius_array": null,
+  "rotation": false,
+  "omega_array": null,
+  "nearest_neighbors": true,
+  "tstart": 2.0,
+  "tend": Infinity,
+  "outdir": "interaction_diagnostics_radius_le_002",
+  "skipped_without_dem": 0,
+  "frames": 26,
+  "time_sources": [
+    "filename index (verify numbering)"
+  ],
+  "notes": [
+    "Geometric occupancy, not verified solver force-pair count.",
+    "Slip at finite particle-center gaps, not extrapolated surface slip length.",
+    "No particle attachment/residence tracking.",
+    "Time statistics assume linear interpolation between snapshots.",
+    "Use parameters archived with this run, not necessarily current repository values."
+  ]
+}
