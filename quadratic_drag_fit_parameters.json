@@ -1,0 +1,34 @@
+{
+  "input_csv": "stokes_relative_velocity_comparison.csv",
+  "fit_to": "position",
+  "frame": "relative",
+  "initial_velocity": 0.000727479418029714,
+  "position_source": "x_sim_unwrapped",
+  "n_frames": 60,
+  "time_start": 0.0,
+  "time_end": 29.5,
+  "quadratic": {
+    "g_prime": 0.001293433557856591,
+    "v_terminal": 0.024420375540120352,
+    "characteristic_time": 18.880270572682907,
+    "rmse": 0.0019441070830287434,
+    "r_squared": 0.9997895820485221,
+    "jacobian_condition": 6.755854763480848,
+    "near_parameter_bound": false,
+    "observed_fraction_of_terminal_speed": 0.9911908586013909
+  },
+  "fitted_linear_comparison": {
+    "g_prime": 0.0015093972565394984,
+    "v_terminal": 0.02998821765447432,
+    "characteristic_time": 19.8676773291787,
+    "rmse": 0.0009708325169686319,
+    "r_squared": 0.9999475275851629,
+    "jacobian_condition": 10.954414508277642,
+    "near_parameter_bound": false
+  },
+  "notes": [
+    "Fitted terminal speed is an extrapolation, not an observed plateau.",
+    "A better fit does not establish high Reynolds number or identify added mass.",
+    "For accelerating fluid, relative-frame fit parameters are effective, not exact force-law constants."
+  ]
+}

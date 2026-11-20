@@ -142,7 +142,7 @@
                 1
             ],
             "Variables": {
-                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_DRAG",
+                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_DRAG_GHOST",
                 "PARTICLE_COHESION": 0.0,
                 "STATIC_FRICTION": 0.0,
                 "DYNAMIC_FRICTION": 0.0,
@@ -153,9 +153,9 @@
                 "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.20,
                 "DPD_CUTOFF_RADIUS": 0.40,
-                "DPD_CONSERVATIVE_COEFF": 9.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 1080.0,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL":4320.0
+                "DPD_CONSERVATIVE_COEFF": 0.5,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 270.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL":1080.0
             }
         },
         {
@@ -168,7 +168,7 @@
                 3
             ],
             "Variables": {
-                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_DRAG",
+                "DEM_DISCONTINUUM_CONSTITUTIVE_LAW_NAME": "DEM_DPD_DRAG_GHOST",
                 "PARTICLE_COHESION": 0.0,
                 "STATIC_FRICTION": 0.0,
                 "DYNAMIC_FRICTION": 0.0,
@@ -179,9 +179,9 @@
                 "DAMPING_GAMMA": 0.0,
                 "DPD_SMOOTHING_LENGTH": 0.20,
                 "DPD_CUTOFF_RADIUS": 0.40,
-                "DPD_CONSERVATIVE_COEFF": 9.0,
-                "DPD_DISSIPATIVE_COEFF_NORMAL": 1080.0,
-                "DPD_DISSIPATIVE_COEFF_TANGENTIAL":4320.0
+                "DPD_CONSERVATIVE_COEFF": 0.5,
+                "DPD_DISSIPATIVE_COEFF_NORMAL": 270.0,
+                "DPD_DISSIPATIVE_COEFF_TANGENTIAL":1080.0
             }
         },
         {

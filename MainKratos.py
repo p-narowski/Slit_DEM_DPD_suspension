@@ -26,7 +26,7 @@ class DEMAnalysisStageWithFlush(DEMAnalysisStage):
 
         # The DEM inlet stops at t = 1.5 s. The driving force is applied at
         # the FIRST simulation time step after that time.
-        self.force_start_time = 0.5
+        self.force_start_time = 0.1
 
         # Prescribed external force on each selected suspended particle.
         # Example direction: +X.
